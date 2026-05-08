@@ -10,10 +10,11 @@ export const load: PageServerLoad = async ({ platform }) => {
 	const db = await getDatabase(platform);
 
 	const now = new Date();
-	const rangeStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+	// Load 6 months back and 6 months forward so calendar navigation feels populated
+	const rangeStart = new Date(now.getFullYear(), now.getMonth() - 6, 1)
 		.toISOString()
 		.split('T')[0];
-	const rangeEnd = new Date(now.getFullYear(), now.getMonth() + 2, 0)
+	const rangeEnd = new Date(now.getFullYear(), now.getMonth() + 7, 0)
 		.toISOString()
 		.split('T')[0];
 
