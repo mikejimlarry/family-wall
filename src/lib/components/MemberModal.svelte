@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Member } from '$lib/types';
+	import { untrack } from 'svelte';
 
 	type Props = {
 		member?: Member | null;
@@ -25,12 +26,17 @@
 
 	const PRESET_EMOJIS = ['👤','👦','👧','👨','👩','🧒','🧑','👴','👵','🧔','👱','🧓'];
 
-	let name = $state(member?.name ?? '');
-	let color = $state(member?.color ?? '#60a5fa');
-	let emoji = $state(member?.emoji ?? '👤');
-	let birthday = $state(member?.birthday ?? '');
+	// Snapshot the member prop once — these are editable form fields, not reactive bindings
+	const m = untrack(() => member);
+	let name = $state(m?.name ?? '');
+	let color = $state(m?.color ?? '#60a5fa');
+	let emoji = $state(m?.emoji ?? '👤');
+	let birthday = $state(m?.birthday ?? '');
 	let nameError = $state('');
 	let confirmDelete = $state(false);
+
+	// Reactive: re-evaluate if member prop ever changes (e.g. parent swaps which member to edit)
+	const isEdit = $derived(Boolean(member));
 
 	function handleSave() {
 		if (!name.trim()) {
@@ -48,8 +54,6 @@
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape') onClose();
 	}
-
-	const isEdit = Boolean(member);
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
@@ -110,8 +114,8 @@
 		</div>
 
 		<!-- Color -->
-		<div class="flex flex-col gap-2">
-			<label class="text-sm font-medium text-slate-400">Color</label>
+		<div class="flex flex-col gap-2" role="group" aria-label="Color">
+			<span class="text-sm font-medium text-slate-400">Color</span>
 			<div class="flex flex-wrap gap-2">
 				{#each PRESET_COLORS as c}
 					<button

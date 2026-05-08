@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Member } from '$lib/types';
+	import { untrack } from 'svelte';
 
 	type Props = {
 		members: Member[];
@@ -15,7 +16,8 @@
 
 	let { members, initialDate, onSave, onClose }: Props = $props();
 
-	const defaultDate = initialDate ?? new Date().toISOString().split('T')[0];
+	// Intentional one-time capture: form seed from prop, not reactive
+	const defaultDate = untrack(() => initialDate) ?? new Date().toISOString().split('T')[0];
 	let title = $state('');
 	let startDate = $state(defaultDate);
 	let allDay = $state(true);

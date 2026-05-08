@@ -1,12 +1,12 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import type { WeatherData } from '$lib/weather';
 
 	type Props = { initialData: WeatherData | null };
 	let { initialData }: Props = $props();
 
-	// Destructure before $state so we capture values, not a live prop reference
-	const seedData = initialData;
+	// Intentional one-time capture: seed state from prop, don't re-sync on prop changes
+	const seedData = untrack(() => initialData);
 	let data = $state<WeatherData | null>(seedData);
 	let needsLocation = $state(seedData === null);
 	let showEditor = $state(false);
@@ -17,6 +17,7 @@
 	let searchQuery = $state('');
 	let searchResults = $state<{ name: string; admin1: string; country_code: string; latitude: number; longitude: number }[]>([]);
 	let searching = $state(false);
+	let searchError = $state('');
 	let selectedUnit = $state<'fahrenheit' | 'celsius'>(seedData?.unit ?? 'fahrenheit');
 
 	const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -64,12 +65,17 @@
 		if (!searchQuery.trim()) return;
 		searching = true;
 		searchResults = [];
+		searchError = '';
 		try {
 			const res = await fetch(
 				`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(searchQuery)}&count=5&language=en&format=json`
 			);
+			if (!res.ok) throw new Error(`Search failed (${res.status})`);
 			const json = await res.json() as { results?: typeof searchResults };
 			searchResults = json.results ?? [];
+			if (searchResults.length === 0) searchError = 'No locations found — try a different name';
+		} catch (e) {
+			searchError = e instanceof Error ? e.message : 'Search failed';
 		} finally {
 			searching = false;
 		}
@@ -131,12 +137,16 @@
 						{searching ? '…' : 'Search'}
 					</button>
 					<button
-						onclick={() => { showEditor = false; searchResults = []; }}
+						onclick={() => { showEditor = false; searchResults = []; searchError = ''; }}
 						class="px-2 py-1.5 text-slate-500 hover:text-slate-300 text-sm"
 					>
 						✕
 					</button>
 				</div>
+
+				{#if searchError}
+					<p class="text-red-400 text-xs">{searchError}</p>
+				{/if}
 
 				<!-- Unit toggle -->
 				<div class="flex gap-1 text-xs">

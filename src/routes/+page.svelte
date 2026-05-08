@@ -10,11 +10,12 @@
 	import WeatherWidget from '$lib/components/WeatherWidget.svelte';
 	import AdminBar from '$lib/components/AdminBar.svelte';
 	import MemberModal from '$lib/components/MemberModal.svelte';
+	import { untrack } from 'svelte';
 
 	let { data }: { data: PageData } = $props();
 
-	// Destructure once so $state captures values, not a reactive reference to data
-	const { members: initialMembers, events: initialEvents, chores: initialChores, weather: initialWeather } = data;
+	// Intentional one-time capture: seed local $state from server load, not kept in sync
+	const { members: initialMembers, events: initialEvents, chores: initialChores, weather: initialWeather } = untrack(() => data);
 	let members = $state<Member[]>(initialMembers as Member[]);
 	let events = $state<CalendarEvent[]>(initialEvents as CalendarEvent[]);
 	let chores = $state<Chore[]>(initialChores as Chore[]);
