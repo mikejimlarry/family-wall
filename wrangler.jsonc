@@ -1,0 +1,17 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "family-wall",
+	"compatibility_date": "2026-05-08",
+	"compatibility_flags": [
+		"nodejs_als"
+	],
+	"pages_build_output_dir": ".svelte-kit/cloudflare",
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "family-wall",
+			"database_id": "placeholder-replace-after-d1-create",
+			"migrations_dir": "drizzle"
+		}
+	]
+}
