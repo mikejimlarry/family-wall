@@ -4,11 +4,12 @@
 	type Props = {
 		events: CalendarEvent[];
 		members: Member[];
+		adminMode: boolean;
 		onAddEvent: (date: string) => void;
 		onDeleteEvent: (id: string) => void;
 	};
 
-	let { events, members, onAddEvent, onDeleteEvent }: Props = $props();
+	let { events, members, adminMode, onAddEvent, onDeleteEvent }: Props = $props();
 
 	const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 	const MONTHS = [
@@ -186,12 +187,14 @@
 						day: 'numeric'
 					})}
 				</span>
-				<button
-					onclick={() => onAddEvent(selectedDate!)}
-					class="text-xs px-3 py-1 rounded-full bg-blue-600 hover:bg-blue-500 text-white transition-colors"
-				>
-					+ Add event
-				</button>
+				{#if adminMode}
+					<button
+						onclick={() => onAddEvent(selectedDate!)}
+						class="text-xs px-3 py-1 rounded-full bg-blue-600 hover:bg-blue-500 text-white transition-colors"
+					>
+						+ Add event
+					</button>
+				{/if}
 			</div>
 			{#if selectedEvents.length === 0}
 				<p class="text-xs text-slate-500">No events — tap to add one.</p>
@@ -219,16 +222,18 @@
 							{memberMap.get(event.memberId)?.name}
 						</span>
 					{/if}
-					<button
-						onclick={() => onDeleteEvent(event.id)}
-						class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 text-xs transition-opacity"
-					>
-						✕
-					</button>
+					{#if adminMode}
+						<button
+							onclick={() => onDeleteEvent(event.id)}
+							class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 text-xs transition-opacity"
+						>
+							✕
+						</button>
+					{/if}
 				</div>
 			{/each}
 		</div>
-	{:else}
+	{:else if adminMode}
 		<button
 			onclick={() => onAddEvent(todayStr)}
 			class="text-sm text-slate-500 hover:text-slate-300 transition-colors text-left px-1"

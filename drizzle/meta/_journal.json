@@ -15,6 +15,13 @@
       "when": 1778263816616,
       "tag": "0001_milky_the_stranger",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1778264662819,
+      "tag": "0002_majestic_stature",
+      "breakpoints": true
     }
   ]
 }

@@ -58,6 +58,15 @@ function applyMigrations(sqlite: ReturnType<typeof Database>) {
 		console.log('[dev-db] Seeded initial member: Mike');
 	}
 
+	// Seed default admin PIN on first run (change via admin settings)
+	const pinSet = sqlite.prepare(`SELECT value FROM app_settings WHERE key = 'admin.pin'`).get();
+	if (!pinSet) {
+		sqlite
+			.prepare(`INSERT OR IGNORE INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)`)
+			.run('admin.pin', '1234', Date.now());
+		console.log('[dev-db] Seeded default admin PIN: 1234');
+	}
+
 	// Seed weather location on first run
 	const locSet = sqlite
 		.prepare(`SELECT value FROM app_settings WHERE key = 'weather.lat'`)

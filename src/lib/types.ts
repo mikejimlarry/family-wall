@@ -24,6 +24,8 @@ export type Chore = {
 	assignedTo: string | null;
 	completed: boolean;
 	completedAt: Date | null;
+	approved: boolean;
+	approvedAt: Date | null;
 	dueDate: string | null;
 	recurrence: string | null;
 	sortOrder: number;

@@ -8,6 +8,8 @@ export const PATCH: RequestHandler = async ({ params, request, platform }) => {
 	const db = await getDatabase(platform);
 	const body = await request.json() as {
 		completed?: boolean;
+		approved?: boolean;
+		rejected?: boolean; // convenience: resets completed+approved back to todo
 		title?: string;
 		assignedTo?: string | null;
 		dueDate?: string | null;
@@ -15,9 +17,22 @@ export const PATCH: RequestHandler = async ({ params, request, platform }) => {
 	};
 
 	const updates: Partial<typeof chores.$inferInsert> = {};
-	if ('completed' in body) {
-		updates.completed = body.completed;
-		updates.completedAt = body.completed ? new Date() : null;
+
+	if (body.rejected) {
+		// Parent rejected — send back to todo
+		updates.completed = false;
+		updates.completedAt = null;
+		updates.approved = false;
+		updates.approvedAt = null;
+	} else {
+		if ('completed' in body) {
+			updates.completed = body.completed;
+			updates.completedAt = body.completed ? new Date() : null;
+		}
+		if ('approved' in body) {
+			updates.approved = body.approved;
+			updates.approvedAt = body.approved ? new Date() : null;
+		}
 	}
 	if ('title' in body) updates.title = body.title;
 	if ('assignedTo' in body) updates.assignedTo = body.assignedTo;

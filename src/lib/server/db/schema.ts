@@ -30,8 +30,12 @@ export const chores = sqliteTable('chores', {
 	id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
 	title: text('title').notNull(),
 	assignedTo: text('assigned_to').references(() => familyMembers.id, { onDelete: 'set null' }),
+	// completed = true means "child marked done, pending approval"
 	completed: integer('completed', { mode: 'boolean' }).notNull().default(false),
 	completedAt: integer('completed_at', { mode: 'timestamp' }),
+	// approved = true means "parent approved — hidden from main list"
+	approved: integer('approved', { mode: 'boolean' }).notNull().default(false),
+	approvedAt: integer('approved_at', { mode: 'timestamp' }),
 	dueDate: text('due_date'),
 	recurrence: text('recurrence'),
 	sortOrder: integer('sort_order').notNull().default(0),
