@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { CalendarEvent, Member } from '$lib/types';
+	import { onMount } from 'svelte';
 
 	type CalendarView = 'day' | 'week' | 'month' | 'year';
 
@@ -12,6 +13,9 @@
 	};
 
 	let { events, members, adminMode, onAddEvent, onDeleteEvent }: Props = $props();
+
+	const HOUR_HEIGHT = 56; // px per hour in the day timeline
+	const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
 	const DAYS       = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 	const DAYS_1     = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -31,6 +35,36 @@
 	const filteredEvents = $derived(
 		activeMemberId ? events.filter((e) => e.memberId === activeMemberId) : events
 	);
+
+	// ── Day timeline ──────────────────────────────────────────────
+
+	let currentTime  = $state(new Date());
+	let timelineEl   = $state<HTMLDivElement | null>(null);
+
+	onMount(() => {
+		const id = setInterval(() => { currentTime = new Date(); }, 30_000);
+		return () => clearInterval(id);
+	});
+
+	// Auto-scroll to current time whenever the timeline element appears (i.e. on entering day view)
+	$effect(() => {
+		if (timelineEl) {
+			const mins = currentTime.getHours() * 60 + currentTime.getMinutes();
+			const target = Math.max(0, (mins / 60) * HOUR_HEIGHT - 96);
+			requestAnimationFrame(() => { if (timelineEl) timelineEl.scrollTop = target; });
+		}
+	});
+
+	function formatHour(h: number): string {
+		if (h === 0)   return '12 AM';
+		if (h < 12)    return `${h} AM`;
+		if (h === 12)  return '12 PM';
+		return `${h - 12} PM`;
+	}
+
+	function formatNow(d: Date): string {
+		return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+	}
 
 	// ── Navigation ─────────────────────────────────────────────────
 
@@ -363,45 +397,89 @@
 	<!-- ══════════════════════════════════════════════════════════ -->
 	{:else if currentView === 'day'}
 
-		<div class="flex flex-col gap-2 flex-1 overflow-y-auto">
-			{#if dayEvents.length === 0}
-				<div class="flex flex-col items-center justify-center h-40 text-slate-500 text-sm gap-3">
-					<span>No events this day</span>
+		<div class="flex flex-col flex-1 min-h-0 overflow-hidden">
+
+			<!-- All-day events row -->
+			<div class="flex items-start gap-0 border-b border-slate-800 pb-2 mb-1 shrink-0">
+				<span class="text-[10px] font-medium text-slate-600 uppercase tracking-wide w-16 text-right pr-3 pt-1 shrink-0 select-none">
+					All day
+				</span>
+				<div class="flex flex-wrap gap-1 flex-1">
+					{#each dayEvents as event (event.id)}
+						<div class="group flex items-center gap-1">
+							<span
+								class="text-xs px-2 py-0.5 rounded-full leading-tight"
+								style="background-color: {eventColor(event)}28; color: {eventColor(event)}"
+							>{event.title}</span>
+							{#if adminMode && event.source !== 'birthday'}
+								<button
+									onclick={() => onDeleteEvent(event.id)}
+									class="opacity-0 group-hover:opacity-100 text-slate-600 hover:text-red-400 text-[10px] transition-opacity leading-none"
+									aria-label="Delete event"
+								>✕</button>
+							{/if}
+						</div>
+					{/each}
 					{#if adminMode}
 						<button
 							onclick={() => onAddEvent(dayStr)}
-							class="text-xs px-4 py-2 rounded-full bg-blue-600 hover:bg-blue-500 text-white transition-colors"
-						>+ Add event</button>
+							class="text-xs px-2 py-0.5 rounded-full border border-slate-700 hover:border-slate-500 text-slate-600 hover:text-slate-300 transition-colors leading-tight"
+						>+ Add</button>
+					{/if}
+					{#if dayEvents.length === 0 && !adminMode}
+						<span class="text-xs text-slate-700 italic">No events</span>
 					{/if}
 				</div>
-			{:else}
-				{#each dayEvents as event (event.id)}
-					<div
-						class="group flex items-start gap-3 p-3 rounded-xl"
-						style="background-color: {eventColor(event)}18; border-left: 3px solid {eventColor(event)}"
-					>
-						<div class="flex-1 min-w-0">
-							<p class="text-sm font-medium" style="color: {eventColor(event)}">{event.title}</p>
-							{#if event.memberId}
-								<p class="text-xs text-slate-400 mt-0.5">{memberMap.get(event.memberId)?.name}</p>
-							{/if}
-						</div>
-						{#if adminMode && event.source !== 'birthday'}
-							<button
-								onclick={() => onDeleteEvent(event.id)}
-								class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 text-xs transition-opacity shrink-0 mt-0.5"
-							>✕</button>
-						{/if}
-					</div>
-				{/each}
+			</div>
 
-				{#if adminMode}
-					<button
-						onclick={() => onAddEvent(dayStr)}
-						class="text-sm text-slate-500 hover:text-slate-300 transition-colors text-left px-1 mt-1"
-					>+ Add event</button>
-				{/if}
-			{/if}
+			<!-- Hourly timeline -->
+			<div class="flex-1 overflow-y-auto" bind:this={timelineEl}>
+				<div class="relative select-none" style="height: {24 * HOUR_HEIGHT}px">
+
+					<!-- Hour rows -->
+					{#each HOURS as hour}
+						<div
+							class="absolute left-0 right-0 flex items-start pointer-events-none"
+							style="top: {hour * HOUR_HEIGHT}px; height: {HOUR_HEIGHT}px"
+						>
+							<!-- Hour label -->
+							<span class="text-[10px] text-slate-600 w-16 text-right pr-3 shrink-0 -mt-2 leading-none tabular-nums">
+								{formatHour(hour)}
+							</span>
+							<!-- Divider line -->
+							<div class="flex-1 border-t border-slate-800"></div>
+						</div>
+
+						<!-- Half-hour tick -->
+						<div
+							class="absolute right-0 pointer-events-none"
+							style="left: 4rem; top: {hour * HOUR_HEIGHT + HOUR_HEIGHT / 2}px"
+						>
+							<div class="border-t border-slate-800/50 w-full" style="margin-left: 0"></div>
+						</div>
+					{/each}
+
+					<!-- Current time indicator (today only) -->
+					{#if dayStr === todayStr}
+						{@const nowMins = currentTime.getHours() * 60 + currentTime.getMinutes()}
+						{@const nowTop  = (nowMins / 60) * HOUR_HEIGHT}
+						<div
+							class="absolute left-0 right-0 flex items-center z-10 pointer-events-none"
+							style="top: {nowTop}px"
+						>
+							<!-- Time label -->
+							<span class="text-[10px] font-semibold text-red-400 w-16 text-right pr-2 shrink-0 tabular-nums leading-none">
+								{formatNow(currentTime)}
+							</span>
+							<!-- Dot -->
+							<div class="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0 shadow-[0_0_6px_2px_rgba(239,68,68,0.4)]"></div>
+							<!-- Line -->
+							<div class="flex-1 h-px bg-red-500 opacity-70"></div>
+						</div>
+					{/if}
+
+				</div>
+			</div>
 		</div>
 
 	<!-- ══════════════════════════════════════════════════════════ -->
