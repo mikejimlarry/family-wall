@@ -411,6 +411,10 @@
 
 		<div class="grid grid-cols-4 gap-3 flex-1 overflow-y-auto content-start">
 			{#each yearMonths as { month: m, name, grid } (m)}
+				{@const monthEvts = grid
+					.filter((c) => c.current)
+					.flatMap((c) => eventsForDate(c.dateStr))
+					.slice(0, 6)}
 				<button
 					onclick={() => goToMonth(m)}
 					class="bg-slate-800/60 hover:bg-slate-800 rounded-xl p-2.5 flex flex-col gap-1.5 transition-colors text-left"
@@ -444,10 +448,6 @@
 					</div>
 
 					<!-- Event color dots for the month -->
-					{@const monthEvts = grid
-						.filter((c) => c.current)
-						.flatMap((c) => eventsForDate(c.dateStr))
-						.slice(0, 6)}
 					{#if monthEvts.length > 0}
 						<div class="flex gap-0.5 flex-wrap mt-0.5">
 							{#each monthEvts as event (event.id)}
