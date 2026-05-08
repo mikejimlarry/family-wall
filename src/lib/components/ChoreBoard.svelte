@@ -24,15 +24,43 @@
 		activeMemberId ? chores.filter((c) => c.assignedTo === activeMemberId) : chores
 	);
 
-	// Bucket chores into three groups
-	const todo            = $derived(filteredChores.filter((c) => !c.completed && !c.approved).sort((a, b) => a.sortOrder - b.sortOrder));
+	function todayMidnight() {
+		const d = new Date();
+		d.setHours(0, 0, 0, 0);
+		return d;
+	}
+
+	// Active chores split into overdue vs upcoming
+	const overdue = $derived.by(() => {
+		const now = todayMidnight();
+		return filteredChores
+			.filter((c) => !c.completed && !c.approved && !!c.dueDate)
+			.filter((c) => new Date(c.dueDate! + 'T12:00:00') < now)
+			.sort((a, b) => a.dueDate!.localeCompare(b.dueDate!)); // most-overdue first
+	});
+
+	// Upcoming = active, not overdue; sorted soonest-due first, then no-due-date by sortOrder
+	const upcoming = $derived.by(() => {
+		const now = todayMidnight();
+		const withDue = filteredChores
+			.filter((c) => !c.completed && !c.approved && !!c.dueDate)
+			.filter((c) => new Date(c.dueDate! + 'T12:00:00') >= now)
+			.sort((a, b) => a.dueDate!.localeCompare(b.dueDate!));
+		const noDue = filteredChores
+			.filter((c) => !c.completed && !c.approved && !c.dueDate)
+			.sort((a, b) => a.sortOrder - b.sortOrder);
+		return [...withDue, ...noDue];
+	});
+
 	const pendingApproval = $derived(filteredChores.filter((c) => c.completed && !c.approved));
 	const approved        = $derived(filteredChores.filter((c) => c.approved).sort((a, b) => {
-		// Most recently approved first
 		const aTime = a.approvedAt ? new Date(a.approvedAt).getTime() : 0;
 		const bTime = b.approvedAt ? new Date(b.approvedAt).getTime() : 0;
 		return bTime - aTime;
 	}));
+
+	// Total active count for the header badge
+	const activeCount = $derived(overdue.length + upcoming.length);
 
 	let showHistory = $state(false);
 
@@ -49,13 +77,14 @@
 	function formatDue(dueDate: string | null) {
 		if (!dueDate) return null;
 		const d = new Date(dueDate + 'T12:00:00');
-		const today = new Date();
-		today.setHours(0, 0, 0, 0);
-		const diff = Math.floor((d.getTime() - today.getTime()) / 86400000);
-		if (diff < 0)  return { label: 'Overdue', overdue: true };
+		const now = todayMidnight();
+		const diff = Math.floor((d.getTime() - now.getTime()) / 86400000);
 		if (diff === 0) return { label: 'Today', overdue: false };
 		if (diff === 1) return { label: 'Tomorrow', overdue: false };
-		return { label: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), overdue: false };
+		if (diff > 1)   return { label: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), overdue: false };
+		// Overdue — shouldn't appear inline (shown in banner), but kept as fallback
+		const days = Math.abs(diff);
+		return { label: days === 1 ? '1 day overdue' : `${days} days overdue`, overdue: true };
 	}
 
 	function recurrenceLabel(r: string | null) {
@@ -74,9 +103,14 @@
 	<div class="flex items-center justify-between">
 		<div class="flex items-center gap-2">
 			<h2 class="text-xl font-semibold text-white">Chores</h2>
-			{#if todo.length > 0}
+			{#if overdue.length > 0}
+				<span class="text-xs px-2 py-0.5 rounded-full bg-red-500/25 text-red-400 font-medium">
+					{overdue.length} overdue
+				</span>
+			{/if}
+			{#if activeCount > 0}
 				<span class="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-medium">
-					{todo.length} left
+					{activeCount} left
 				</span>
 			{:else if pendingApproval.length === 0}
 				<span class="text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 font-medium">
@@ -122,7 +156,7 @@
 
 	<!-- Chore list -->
 	<div class="flex flex-col gap-1 overflow-y-auto flex-1 pr-1">
-		{#if todo.length === 0 && pendingApproval.length === 0}
+		{#if activeCount === 0 && pendingApproval.length === 0}
 			<div class="flex flex-col items-center justify-center h-32 text-slate-500 text-sm gap-2">
 				<span>No chores! 🎉</span>
 				{#if adminMode}
@@ -133,6 +167,47 @@
 						Add one
 					</button>
 				{/if}
+			</div>
+		{/if}
+
+		<!-- ── Overdue alert ── -->
+		{#if overdue.length > 0}
+			<div class="rounded-xl border border-red-700/60 bg-red-950/50 overflow-hidden">
+				<div class="flex items-center gap-2 px-3 py-2 border-b border-red-700/40">
+					<span class="text-base leading-none">⚠️</span>
+					<span class="text-xs font-semibold text-red-400 uppercase tracking-wide">Overdue</span>
+				</div>
+				<div class="flex flex-col divide-y divide-red-900/40">
+					{#each overdue as chore (chore.id)}
+						{@const recur = recurrenceLabel(chore.recurrence)}
+						{@const daysDiff = Math.abs(Math.floor((new Date(chore.dueDate! + 'T12:00:00').getTime() - todayMidnight().getTime()) / 86400000))}
+						<div class="group flex items-center gap-2 px-3 py-2.5">
+							<button
+								onclick={() => onMarkDone(chore.id)}
+								class="w-5 h-5 rounded-full border-2 shrink-0 transition-colors border-red-600 hover:border-red-400 hover:bg-red-400/10"
+								aria-label="Mark as done"
+							></button>
+							<div class="flex-1 min-w-0">
+								<div class="flex items-center gap-2 flex-wrap">
+									<p class="text-sm text-red-200 truncate">{chore.title}</p>
+									{#if recur}
+										<span class="text-xs px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-400 shrink-0">↻ {recur}</span>
+									{/if}
+								</div>
+								<p class="text-xs text-red-400/80 mt-0.5">
+									{daysDiff === 1 ? '1 day overdue' : `${daysDiff} days overdue`}
+									{#if chore.assignedTo} · {memberName(chore.assignedTo)}{/if}
+								</p>
+							</div>
+							{#if adminMode}
+								<div class="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+									<button onclick={() => onEdit(chore)} class="w-7 h-7 flex items-center justify-center rounded-lg text-red-700 hover:text-blue-400 hover:bg-slate-700 transition-colors text-xs" aria-label="Edit">✎</button>
+									<button onclick={() => onDelete(chore.id)} class="w-7 h-7 flex items-center justify-center rounded-lg text-red-700 hover:text-red-400 hover:bg-slate-700 transition-colors" aria-label="Delete">✕</button>
+								</div>
+							{/if}
+						</div>
+					{/each}
+				</div>
 			</div>
 		{/if}
 
@@ -187,24 +262,29 @@
 			{/each}
 		{/if}
 
-		<!-- ── Todo ── -->
-		{#each todo as chore, i (chore.id)}
+		<!-- ── Upcoming / no-due-date ── -->
+		{#each upcoming as chore, i (chore.id)}
 			{@const due = formatDue(chore.dueDate)}
 			{@const recur = recurrenceLabel(chore.recurrence)}
+			<!-- Reorder only applies to no-due-date chores (due-date chores are sorted by date) -->
+			{@const canReorder = adminMode && activeMemberId === null && !chore.dueDate}
+			<!-- Index among no-due-date chores for disabling first/last arrows -->
+			{@const noDueChores = upcoming.filter(c => !c.dueDate)}
+			{@const noDueIdx = noDueChores.findIndex(c => c.id === chore.id)}
 			<div class="group flex items-center gap-2 p-3 rounded-xl bg-slate-800 hover:bg-slate-750 transition-colors">
 
-				<!-- Reorder buttons (admin, no filter active) -->
-				{#if adminMode && activeMemberId === null}
+				<!-- Reorder buttons (admin, no filter, no due date) -->
+				{#if canReorder}
 					<div class="flex flex-col gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
 						<button
 							onclick={() => onReorder(chore.id, 'up')}
-							disabled={i === 0}
+							disabled={noDueIdx === 0}
 							class="w-5 h-4 flex items-center justify-center text-slate-500 hover:text-slate-300 disabled:opacity-20 disabled:cursor-default text-xs leading-none"
 							aria-label="Move up"
 						>▲</button>
 						<button
 							onclick={() => onReorder(chore.id, 'down')}
-							disabled={i === todo.length - 1}
+							disabled={noDueIdx === noDueChores.length - 1}
 							class="w-5 h-4 flex items-center justify-center text-slate-500 hover:text-slate-300 disabled:opacity-20 disabled:cursor-default text-xs leading-none"
 							aria-label="Move down"
 						>▼</button>
