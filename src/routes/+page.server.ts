@@ -1,10 +1,10 @@
 import type { PageServerLoad } from './$types';
-import { getDb } from '$lib/server/db';
+import { getDatabase } from '$lib/server/db';
 import { familyMembers, chores, events } from '$lib/server/db/schema';
 import { and, gte, lte } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ platform }) => {
-	const db = getDb(platform!.env.DB);
+	const db = await getDatabase(platform);
 
 	const now = new Date();
 	const rangeStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)

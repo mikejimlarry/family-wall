@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:community.home-assistant.io)",
+      "WebFetch(domain:github.com)",
+      "Bash(git init *)",
+      "Bash(git branch *)",
+      "Bash(npm create *)",
+      "Bash(xargs ls -la)",
+      "Bash(mkdir -p /Users/michaellawrence/Sites/family-wall/src/routes/api/chores/\\\\[id\\\\] /Users/michaellawrence/Sites/family-wall/src/routes/api/events/\\\\[id\\\\] /Users/michaellawrence/Sites/family-wall/src/routes/api/members)"
+    ]
+  }
+}

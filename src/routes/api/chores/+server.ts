@@ -1,17 +1,17 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { getDb } from '$lib/server/db';
+import { getDatabase } from '$lib/server/db';
 import { chores } from '$lib/server/db/schema';
 import { asc } from 'drizzle-orm';
 
 export const GET: RequestHandler = async ({ platform }) => {
-	const db = getDb(platform!.env.DB);
+	const db = await getDatabase(platform);
 	const rows = await db.select().from(chores).orderBy(asc(chores.sortOrder), asc(chores.createdAt));
 	return json(rows);
 };
 
 export const POST: RequestHandler = async ({ request, platform }) => {
-	const db = getDb(platform!.env.DB);
+	const db = await getDatabase(platform);
 	const body = await request.json() as {
 		title?: string;
 		assignedTo?: string;

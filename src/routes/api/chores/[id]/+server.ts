@@ -1,11 +1,11 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { getDb } from '$lib/server/db';
+import { getDatabase } from '$lib/server/db';
 import { chores } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 
 export const PATCH: RequestHandler = async ({ params, request, platform }) => {
-	const db = getDb(platform!.env.DB);
+	const db = await getDatabase(platform);
 	const body = await request.json() as {
 		completed?: boolean;
 		title?: string;
@@ -35,7 +35,7 @@ export const PATCH: RequestHandler = async ({ params, request, platform }) => {
 };
 
 export const DELETE: RequestHandler = async ({ params, platform }) => {
-	const db = getDb(platform!.env.DB);
+	const db = await getDatabase(platform);
 	const deleted = await db.delete(chores).where(eq(chores.id, params.id)).returning();
 
 	if (!deleted.length) throw error(404, 'Chore not found');

@@ -1,11 +1,11 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { getDb } from '$lib/server/db';
+import { getDatabase } from '$lib/server/db';
 import { events } from '$lib/server/db/schema';
 import { and, gte, lte } from 'drizzle-orm';
 
 export const GET: RequestHandler = async ({ url, platform }) => {
-	const db = getDb(platform!.env.DB);
+	const db = await getDatabase(platform);
 	const start = url.searchParams.get('start');
 	const end = url.searchParams.get('end');
 
@@ -22,7 +22,7 @@ export const GET: RequestHandler = async ({ url, platform }) => {
 };
 
 export const POST: RequestHandler = async ({ request, platform }) => {
-	const db = getDb(platform!.env.DB);
+	const db = await getDatabase(platform);
 	const body = await request.json() as {
 		title?: string;
 		startDate?: string;

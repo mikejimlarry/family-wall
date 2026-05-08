@@ -1,16 +1,16 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { getDb } from '$lib/server/db';
+import { getDatabase } from '$lib/server/db';
 import { familyMembers } from '$lib/server/db/schema';
 
 export const GET: RequestHandler = async ({ platform }) => {
-	const db = getDb(platform!.env.DB);
+	const db = await getDatabase(platform);
 	const members = await db.select().from(familyMembers);
 	return json(members);
 };
 
 export const POST: RequestHandler = async ({ request, platform }) => {
-	const db = getDb(platform!.env.DB);
+	const db = await getDatabase(platform);
 	const body = await request.json() as { name?: string; color?: string; emoji?: string };
 
 	if (!body.name?.trim()) {

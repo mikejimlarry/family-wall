@@ -18,7 +18,8 @@ A self-hosted family dashboard: calendar, chores, and more. Built with SvelteKit
 
 ## Local development
 
-The app runs via Wrangler's local mode so D1 is available during dev.
+The dev server uses **better-sqlite3** directly — no Wrangler or Cloudflare account needed.
+Migrations run automatically on first start, and Mike is seeded into an empty database.
 
 ### 1. Install dependencies
 
@@ -26,27 +27,16 @@ The app runs via Wrangler's local mode so D1 is available during dev.
 npm install
 ```
 
-### 2. Create the local D1 database and run migrations
+### 2. Start the dev server
 
 ```bash
-npm run db:migrate:local
+npm run dev
 ```
 
-### 3. Seed the initial family member (Mike)
+Open [http://localhost:5173](http://localhost:5173). The `dev.db` file is created automatically on first run.
 
-```bash
-npm run db:seed:local
-```
-
-### 4. Build and start the local preview server
-
-```bash
-npm run build && npm run preview
-```
-
-Open [http://localhost:4173](http://localhost:4173).
-
-> **Note:** `npm run dev` (Vite dev server) has no D1 access. Always use `npm run preview` for full functionality.
+> **Wrangler preview** (`npm run preview`) requires macOS 13.5+ for the workerd runtime.
+> Use `npm run dev` instead for local development on older macOS versions.
 
 ## Deploying to Cloudflare Pages
 
