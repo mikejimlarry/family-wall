@@ -11,7 +11,7 @@ export const GET: RequestHandler = async ({ platform }) => {
 
 export const POST: RequestHandler = async ({ request, platform }) => {
 	const db = await getDatabase(platform);
-	const body = await request.json() as { name?: string; color?: string; emoji?: string };
+	const body = await request.json() as { name?: string; color?: string; emoji?: string; birthday?: string };
 
 	if (!body.name?.trim()) {
 		return json({ error: 'Name is required' }, { status: 400 });
@@ -22,7 +22,8 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 		.values({
 			name: body.name.trim(),
 			color: body.color ?? '#60a5fa',
-			emoji: body.emoji ?? '👤'
+			emoji: body.emoji ?? '👤',
+			birthday: body.birthday ?? null
 		})
 		.returning();
 

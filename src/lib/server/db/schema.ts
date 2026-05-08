@@ -11,6 +11,7 @@ export const familyMembers = sqliteTable('family_members', {
 	name: text('name').notNull(),
 	color: text('color').notNull().default('#60a5fa'),
 	emoji: text('emoji').default('👤'),
+	birthday: text('birthday'), // ISO date string e.g. "1990-05-08"
 	createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date())
 });
 

@@ -222,7 +222,7 @@
 							{memberMap.get(event.memberId)?.name}
 						</span>
 					{/if}
-					{#if adminMode}
+					{#if adminMode && event.source !== 'birthday'}
 						<button
 							onclick={() => onDeleteEvent(event.id)}
 							class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 text-xs transition-opacity"

@@ -40,5 +40,38 @@ export const load: PageServerLoad = async ({ platform }) => {
 
 	const hasWeatherLocation = Boolean(s['weather.lat'] && s['weather.lon']);
 
-	return { members, chores: allChores, events: allEvents, weather, hasWeatherLocation };
+	// Inject birthday events from family members
+	const birthdayEvents = [];
+	const startYear = new Date(rangeStart).getFullYear();
+	const endYear = new Date(rangeEnd).getFullYear();
+
+	for (const member of members) {
+		if (!member.birthday) continue;
+		const [, month, day] = member.birthday.split('-').map(Number);
+		for (let year = startYear; year <= endYear; year++) {
+			const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+			if (dateStr < rangeStart || dateStr > rangeEnd) continue;
+			const birthYear = Number(member.birthday.split('-')[0]);
+			const age = year - birthYear;
+			birthdayEvents.push({
+				id: `birthday-${member.id}-${year}`,
+				title: `🎂 ${member.name}'s Birthday (${age})`,
+				startDate: dateStr,
+				endDate: null,
+				allDay: true,
+				memberId: member.id,
+				source: 'birthday',
+				externalId: null,
+				createdAt: null
+			});
+		}
+	}
+
+	return {
+		members,
+		chores: allChores,
+		events: [...allEvents, ...birthdayEvents],
+		weather,
+		hasWeatherLocation
+	};
 };

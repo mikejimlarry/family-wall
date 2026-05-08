@@ -3,6 +3,7 @@ export type Member = {
 	name: string;
 	color: string;
 	emoji: string | null;
+	birthday: string | null; // ISO date e.g. "1990-05-08"
 	createdAt: Date | null;
 };
 

@@ -22,6 +22,13 @@
       "when": 1778264662819,
       "tag": "0002_majestic_stature",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1778265677785,
+      "tag": "0003_cloudy_jetstream",
+      "breakpoints": true
     }
   ]
 }
