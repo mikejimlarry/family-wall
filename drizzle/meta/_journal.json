@@ -8,6 +8,13 @@
       "when": 1778257444540,
       "tag": "0000_supreme_quasimodo",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1778263816616,
+      "tag": "0001_milky_the_stranger",
+      "breakpoints": true
     }
   ]
 }

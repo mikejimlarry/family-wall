@@ -45,10 +45,10 @@ function applyMigrations(sqlite: ReturnType<typeof Database>) {
 	}
 
 	// Seed initial member on first run
-	const count = (
+	const memberCount = (
 		sqlite.prepare('SELECT COUNT(*) as n FROM family_members').get() as { n: number }
 	).n;
-	if (count === 0) {
+	if (memberCount === 0) {
 		sqlite
 			.prepare(
 				`INSERT INTO family_members (id, name, color, emoji, created_at)
@@ -56,6 +56,27 @@ function applyMigrations(sqlite: ReturnType<typeof Database>) {
 			)
 			.run(Date.now());
 		console.log('[dev-db] Seeded initial member: Mike');
+	}
+
+	// Seed weather location on first run
+	const locSet = sqlite
+		.prepare(`SELECT value FROM app_settings WHERE key = 'weather.lat'`)
+		.get();
+	if (!locSet) {
+		const now = Date.now();
+		sqlite
+			.prepare(`INSERT OR IGNORE INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)`)
+			.run('weather.lat', '39.1732', now);
+		sqlite
+			.prepare(`INSERT OR IGNORE INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)`)
+			.run('weather.lon', '-77.2717', now);
+		sqlite
+			.prepare(`INSERT OR IGNORE INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)`)
+			.run('weather.city', 'Germantown, MD', now);
+		sqlite
+			.prepare(`INSERT OR IGNORE INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)`)
+			.run('weather.unit', 'fahrenheit', now);
+		console.log('[dev-db] Seeded weather location: Germantown, MD');
 	}
 }
 

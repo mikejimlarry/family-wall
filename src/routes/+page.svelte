@@ -6,11 +6,13 @@
 	import ChoreBoard from '$lib/components/ChoreBoard.svelte';
 	import EventModal from '$lib/components/EventModal.svelte';
 	import ChoreModal from '$lib/components/ChoreModal.svelte';
+	import WeatherWidget from '$lib/components/WeatherWidget.svelte';
+	import type { WeatherData } from '$lib/weather';
 
 	let { data }: { data: PageData } = $props();
 
 	// Destructure once so $state captures values, not a reactive reference to data
-	const { members: initialMembers, events: initialEvents, chores: initialChores } = data;
+	const { members: initialMembers, events: initialEvents, chores: initialChores, weather: initialWeather } = data;
 	let members = $state<Member[]>(initialMembers as Member[]);
 	let events = $state<CalendarEvent[]>(initialEvents as CalendarEvent[]);
 	let chores = $state<Chore[]>(initialChores as Chore[]);
@@ -89,13 +91,9 @@
 
 <div class="min-h-screen bg-slate-900 text-white flex flex-col">
 	<!-- Top bar -->
-	<header class="flex items-start justify-between px-8 pt-6 pb-4 border-b border-slate-800">
+	<header class="flex items-center justify-between px-8 pt-6 pb-4 border-b border-slate-800">
 		<Clock />
-		<div class="flex flex-col items-end gap-1">
-			<span class="text-2xl font-light text-slate-300 tracking-wide">Family Wall</span>
-			<!-- Weather placeholder — swap for a real widget later -->
-			<span class="text-sm text-slate-500">Weather coming soon</span>
-		</div>
+		<WeatherWidget initialData={initialWeather as WeatherData | null} />
 	</header>
 
 	<!-- Main content: calendar + chores -->
