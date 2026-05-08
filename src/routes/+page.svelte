@@ -23,6 +23,7 @@
 	let adminMode = $state(false);
 	let showEventModal = $state(false);
 	let showChoreModal = $state(false);
+	let editingChore = $state<Chore | null>(null);
 	let showPeoplePanel = $state(false);
 	let editingMember = $state<Member | null>(null);
 	let showAddMember = $state(false);
@@ -70,16 +71,26 @@
 		dueDate: string | null;
 		recurrence: string | null;
 	}) {
-		const res = await fetch('/api/chores', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(payload)
-		});
-		if (res.ok) {
-			const chore: Chore = await res.json();
-			chores = [...chores, chore];
+		if (editingChore) {
+			// Edit existing chore
+			await patchChore(editingChore.id, payload);
+			editingChore = null;
+		} else {
+			// Add new chore — place it at the end of the list
+			const nextSortOrder = chores.length === 0
+				? 0
+				: Math.max(...chores.map((c) => c.sortOrder)) + 1;
+			const res = await fetch('/api/chores', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ ...payload, sortOrder: nextSortOrder })
+			});
+			if (res.ok) {
+				const chore: Chore = await res.json();
+				chores = [...chores, chore];
+			}
+			showChoreModal = false;
 		}
-		showChoreModal = false;
 	}
 
 	async function patchChore(id: string, patch: Record<string, unknown>) {
@@ -106,6 +117,46 @@
 	async function deleteChore(id: string) {
 		const res = await fetch(`/api/chores/${id}`, { method: 'DELETE' });
 		if (res.ok) chores = chores.filter((c) => c.id !== id);
+	}
+
+	function openEditChore(chore: Chore) {
+		editingChore = chore;
+		showChoreModal = true;
+	}
+
+	async function reorderChore(id: string, direction: 'up' | 'down') {
+		// Sort only the active (non-completed, non-approved) chores
+		const sorted = chores
+			.filter((c) => !c.completed && !c.approved)
+			.sort((a, b) => a.sortOrder - b.sortOrder);
+
+		const idx = sorted.findIndex((c) => c.id === id);
+		if (idx === -1) return;
+		const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+		if (swapIdx < 0 || swapIdx >= sorted.length) return;
+
+		const a = sorted[idx];
+		const b = sorted[swapIdx];
+
+		// If both share the same sortOrder, assign fresh values before swapping
+		let aOrder = a.sortOrder;
+		let bOrder = b.sortOrder;
+		if (aOrder === bOrder) {
+			aOrder = idx;
+			bOrder = swapIdx;
+		}
+
+		// Optimistic update first
+		chores = chores.map((c) => {
+			if (c.id === a.id) return { ...c, sortOrder: bOrder };
+			if (c.id === b.id) return { ...c, sortOrder: aOrder };
+			return c;
+		});
+
+		await Promise.all([
+			patchChore(a.id, { sortOrder: bOrder }),
+			patchChore(b.id, { sortOrder: aOrder })
+		]);
 	}
 
 	// --- Member handlers ---
@@ -180,6 +231,8 @@
 				onApprove={approveChore}
 				onReject={rejectChore}
 				onDelete={deleteChore}
+				onEdit={openEditChore}
+				onReorder={reorderChore}
 				onAddChore={() => (showChoreModal = true)}
 			/>
 		</section>
@@ -260,8 +313,9 @@
 {#if showChoreModal}
 	<ChoreModal
 		{members}
+		chore={editingChore}
 		onSave={saveChore}
-		onClose={() => (showChoreModal = false)}
+		onClose={() => { showChoreModal = false; editingChore = null; }}
 	/>
 {/if}
 

@@ -1,8 +1,10 @@
 <script lang="ts">
-	import type { Member } from '$lib/types';
+	import type { Chore, Member } from '$lib/types';
+	import { untrack } from 'svelte';
 
 	type Props = {
 		members: Member[];
+		chore?: Chore | null; // if provided → edit mode
 		onSave: (data: {
 			title: string;
 			assignedTo: string | null;
@@ -12,12 +14,16 @@
 		onClose: () => void;
 	};
 
-	let { members, onSave, onClose }: Props = $props();
+	let { members, chore = null, onSave, onClose }: Props = $props();
 
-	let title = $state('');
-	let assignedTo = $state<string>('');
-	let dueDate = $state('');
-	let recurrence = $state('');
+	const isEdit = $derived(Boolean(chore));
+
+	// Snapshot prop for form initialization
+	const c = untrack(() => chore);
+	let title      = $state(c?.title ?? '');
+	let assignedTo = $state(c?.assignedTo ?? '');
+	let dueDate    = $state(c?.dueDate ?? '');
+	let recurrence = $state(c?.recurrence ?? '');
 
 	function submit() {
 		if (!title.trim()) return;
@@ -49,10 +55,10 @@
 	class="fixed inset-0 z-50 flex items-center justify-center p-4"
 	role="dialog"
 	aria-modal="true"
-	aria-label="Add chore"
+	aria-label="{isEdit ? 'Edit' : 'Add'} chore"
 >
 	<div class="bg-slate-800 rounded-2xl p-6 w-full max-w-sm shadow-2xl flex flex-col gap-4">
-		<h3 class="text-lg font-semibold text-white">Add Chore</h3>
+		<h3 class="text-lg font-semibold text-white">{isEdit ? 'Edit Chore' : 'Add Chore'}</h3>
 
 		<!-- svelte-ignore a11y_autofocus -->
 		<input
@@ -87,7 +93,7 @@
 					id="chore-due"
 					type="date"
 					bind:value={dueDate}
-					class="bg-slate-700 text-white rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+					class="bg-slate-700 text-white rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 [color-scheme:dark]"
 				/>
 			</div>
 			<div class="flex-1 flex flex-col gap-1">
@@ -117,7 +123,7 @@
 				disabled={!title.trim()}
 				class="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors"
 			>
-				Add Chore
+				{isEdit ? 'Save' : 'Add Chore'}
 			</button>
 		</div>
 	</div>
