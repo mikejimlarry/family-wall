@@ -1,6 +1,6 @@
 import type { PageServerLoad } from './$types';
 import { getDatabase } from '$lib/server/db';
-import { familyMembers, chores, events, appSettings } from '$lib/server/db/schema';
+import { familyMembers, chores, events, appSettings, groceryItems, mealPlan } from '$lib/server/db/schema';
 import { and, gte, lte } from 'drizzle-orm';
 import type { WeatherData } from '$lib/weather';
 
@@ -18,14 +18,20 @@ export const load: PageServerLoad = async ({ platform }) => {
 		.toISOString()
 		.split('T')[0];
 
-	const [members, allChores, allEvents, settingsRows] = await Promise.all([
+	// Meal plan: load 4 weeks back and 8 weeks forward
+	const mealStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 28).toISOString().split('T')[0];
+	const mealEnd   = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 56).toISOString().split('T')[0];
+
+	const [members, allChores, allEvents, settingsRows, allGrocery, allMeals] = await Promise.all([
 		db.select().from(familyMembers),
 		db.select().from(chores),
 		db
 			.select()
 			.from(events)
 			.where(and(gte(events.startDate, rangeStart), lte(events.startDate, rangeEnd))),
-		db.select().from(appSettings)
+		db.select().from(appSettings),
+		db.select().from(groceryItems),
+		db.select().from(mealPlan).where(and(gte(mealPlan.date, mealStart), lte(mealPlan.date, mealEnd)))
 	]);
 
 	const s = Object.fromEntries(settingsRows.map((r) => [r.key, r.value]));
@@ -72,6 +78,8 @@ export const load: PageServerLoad = async ({ platform }) => {
 		members,
 		chores: allChores,
 		events: [...allEvents, ...birthdayEvents],
+		grocery: allGrocery,
+		meals: allMeals,
 		weather,
 		hasWeatherLocation
 	};

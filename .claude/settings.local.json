@@ -7,7 +7,8 @@
       "Bash(git branch *)",
       "Bash(npm create *)",
       "Bash(xargs ls -la)",
-      "Bash(mkdir -p /Users/michaellawrence/Sites/family-wall/src/routes/api/chores/\\\\[id\\\\] /Users/michaellawrence/Sites/family-wall/src/routes/api/events/\\\\[id\\\\] /Users/michaellawrence/Sites/family-wall/src/routes/api/members)"
+      "Bash(mkdir -p /Users/michaellawrence/Sites/family-wall/src/routes/api/chores/\\\\[id\\\\] /Users/michaellawrence/Sites/family-wall/src/routes/api/events/\\\\[id\\\\] /Users/michaellawrence/Sites/family-wall/src/routes/api/members)",
+      "WebFetch(domain:www.cozyla.com)"
     ]
   }
 }

@@ -42,3 +42,20 @@ export const chores = sqliteTable('chores', {
 	sortOrder: integer('sort_order').notNull().default(0),
 	createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date())
 });
+
+export const groceryItems = sqliteTable('grocery_items', {
+	id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+	name: text('name').notNull(),
+	checked: integer('checked', { mode: 'boolean' }).notNull().default(false),
+	checkedAt: integer('checked_at', { mode: 'timestamp' }),
+	sortOrder: integer('sort_order').notNull().default(0),
+	createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date())
+});
+
+export const mealPlan = sqliteTable('meal_plan', {
+	id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+	date: text('date').notNull().unique(), // ISO date "2026-05-08"
+	meal: text('meal').notNull(),
+	notes: text('notes'),
+	createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date())
+});

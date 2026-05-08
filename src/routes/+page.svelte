@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import type { CalendarEvent, Chore, Member } from '$lib/types';
+	import type { CalendarEvent, Chore, GroceryItem, MealPlan, Member } from '$lib/types';
 	import type { WeatherData } from '$lib/weather';
 	import Clock from '$lib/components/Clock.svelte';
 	import Calendar from '$lib/components/Calendar.svelte';
@@ -10,17 +10,30 @@
 	import WeatherWidget from '$lib/components/WeatherWidget.svelte';
 	import AdminBar from '$lib/components/AdminBar.svelte';
 	import MemberModal from '$lib/components/MemberModal.svelte';
+	import GroceryList from '$lib/components/GroceryList.svelte';
+	import MealPlanPanel from '$lib/components/MealPlan.svelte';
 	import { untrack } from 'svelte';
 
 	let { data }: { data: PageData } = $props();
 
 	// Intentional one-time capture: seed local $state from server load, not kept in sync
-	const { members: initialMembers, events: initialEvents, chores: initialChores, weather: initialWeather } = untrack(() => data);
+	const {
+		members: initialMembers,
+		events: initialEvents,
+		chores: initialChores,
+		grocery: initialGrocery,
+		meals: initialMeals,
+		weather: initialWeather
+	} = untrack(() => data);
+
 	let members = $state<Member[]>(initialMembers as Member[]);
-	let events = $state<CalendarEvent[]>(initialEvents as CalendarEvent[]);
-	let chores = $state<Chore[]>(initialChores as Chore[]);
+	let events  = $state<CalendarEvent[]>(initialEvents as CalendarEvent[]);
+	let chores  = $state<Chore[]>(initialChores as Chore[]);
+	let grocery = $state<GroceryItem[]>(initialGrocery as GroceryItem[]);
+	let meals   = $state<MealPlan[]>(initialMeals as MealPlan[]);
 
 	let adminMode = $state(false);
+	let rightTab = $state<'chores' | 'grocery' | 'meals'>('chores');
 	let showEventModal = $state(false);
 	let showChoreModal = $state(false);
 	let editingChore = $state<Chore | null>(null);
@@ -159,6 +172,59 @@
 		]);
 	}
 
+	// --- Grocery handlers ---
+
+	async function addGroceryItem(name: string) {
+		const nextOrder = grocery.length === 0 ? 0 : Math.max(...grocery.map((i) => i.sortOrder)) + 1;
+		const res = await fetch('/api/grocery', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ name, sortOrder: nextOrder })
+		});
+		if (res.ok) grocery = [...grocery, await res.json()];
+	}
+
+	async function checkGroceryItem(id: string, checked: boolean) {
+		const res = await fetch(`/api/grocery/${id}`, {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ checked })
+		});
+		if (res.ok) {
+			const updated: GroceryItem = await res.json();
+			grocery = grocery.map((i) => (i.id === id ? updated : i));
+		}
+	}
+
+	async function deleteGroceryItem(id: string) {
+		const res = await fetch(`/api/grocery/${id}`, { method: 'DELETE' });
+		if (res.ok) grocery = grocery.filter((i) => i.id !== id);
+	}
+
+	async function clearCheckedGrocery() {
+		const res = await fetch('/api/grocery?checked=true', { method: 'DELETE' });
+		if (res.ok) grocery = grocery.filter((i) => !i.checked);
+	}
+
+	// --- Meal plan handlers ---
+
+	async function saveMeal(date: string, meal: string, notes: string | null) {
+		const res = await fetch(`/api/meals/${date}`, {
+			method: 'PUT',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ meal, notes })
+		});
+		if (res.ok) {
+			const updated: MealPlan = await res.json();
+			meals = [...meals.filter((m) => m.date !== date), updated];
+		}
+	}
+
+	async function deleteMeal(date: string) {
+		const res = await fetch(`/api/meals/${date}`, { method: 'DELETE' });
+		if (res.ok) meals = meals.filter((m) => m.date !== date);
+	}
+
 	// --- Member handlers ---
 
 	async function saveMember(payload: { name: string; color: string; emoji: string; birthday: string | null }) {
@@ -221,20 +287,53 @@
 		<!-- Divider -->
 		<div class="w-px bg-slate-800 my-6"></div>
 
-		<!-- Chores: 40% -->
-		<section class="flex-[2] p-6 overflow-y-auto">
-			<ChoreBoard
-				{chores}
-				{members}
-				{adminMode}
-				onMarkDone={markDone}
-				onApprove={approveChore}
-				onReject={rejectChore}
-				onDelete={deleteChore}
-				onEdit={openEditChore}
-				onReorder={reorderChore}
-				onAddChore={() => (showChoreModal = true)}
-			/>
+		<!-- Right panel: tabbed (Chores / Grocery / Meals) -->
+		<section class="flex-[2] flex flex-col overflow-hidden">
+			<!-- Tab bar -->
+			<div class="flex gap-0.5 px-4 pt-4 pb-2 bg-slate-900 shrink-0">
+				{#each ([['chores', '✓ Chores'], ['grocery', '🛒 Grocery'], ['meals', '🍽 Meals']] as const) as [tab, label]}
+					<button
+						onclick={() => (rightTab = tab)}
+						class="flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors {rightTab === tab
+							? 'bg-slate-700 text-white'
+							: 'text-slate-500 hover:text-slate-300'}"
+					>{label}</button>
+				{/each}
+			</div>
+
+			<!-- Tab content -->
+			<div class="flex-1 overflow-hidden px-4 pb-6 pt-2">
+				{#if rightTab === 'chores'}
+					<ChoreBoard
+						{chores}
+						{members}
+						{adminMode}
+						onMarkDone={markDone}
+						onApprove={approveChore}
+						onReject={rejectChore}
+						onDelete={deleteChore}
+						onEdit={openEditChore}
+						onReorder={reorderChore}
+						onAddChore={() => (showChoreModal = true)}
+					/>
+				{:else if rightTab === 'grocery'}
+					<GroceryList
+						items={grocery}
+						{adminMode}
+						onCheck={checkGroceryItem}
+						onAdd={addGroceryItem}
+						onDelete={deleteGroceryItem}
+						onClearChecked={clearCheckedGrocery}
+					/>
+				{:else if rightTab === 'meals'}
+					<MealPlanPanel
+						{meals}
+						{adminMode}
+						onSave={saveMeal}
+						onDelete={deleteMeal}
+					/>
+				{/if}
+			</div>
 		</section>
 	</main>
 </div>

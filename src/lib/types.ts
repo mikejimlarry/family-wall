@@ -19,6 +19,23 @@ export type CalendarEvent = {
 	createdAt: Date | null;
 };
 
+export type GroceryItem = {
+	id: string;
+	name: string;
+	checked: boolean;
+	checkedAt: Date | null;
+	sortOrder: number;
+	createdAt: Date | null;
+};
+
+export type MealPlan = {
+	id: string;
+	date: string; // ISO date "2026-05-08"
+	meal: string;
+	notes: string | null;
+	createdAt: Date | null;
+};
+
 export type Chore = {
 	id: string;
 	title: string;
