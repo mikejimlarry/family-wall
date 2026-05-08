@@ -25,6 +25,25 @@
 		return DAY_NAMES[new Date(dateStr + 'T12:00:00').getDay()];
 	}
 
+	// Simplify verbose condition labels for kids
+	function simpleLabel(label: string) {
+		const map: Record<string, string> = {
+			'Mainly clear': 'Sunny',
+			'Light drizzle': 'Drizzly',
+			'Heavy drizzle': 'Drizzly',
+			'Light rain': 'Rainy',
+			'Heavy rain': 'Very Rainy',
+			'Light snow': 'Snowy',
+			'Heavy snow': 'Very Snowy',
+			'Snow grains': 'Snowy',
+			'Light showers': 'Showery',
+			'Heavy showers': 'Showery',
+			'Snow showers': 'Snowy',
+			'Icy fog': 'Foggy',
+		};
+		return map[label] ?? label;
+	}
+
 	async function refresh() {
 		loading = true;
 		error = '';
@@ -148,37 +167,40 @@
 			</div>
 		{/if}
 	</div>
+
 {:else if loading && !data}
 	<div class="text-slate-500 text-sm animate-pulse">Loading weather…</div>
+
 {:else if error}
 	<div class="text-red-400 text-xs">{error}</div>
+
 {:else if data}
+	<!-- Main weather display — child-friendly: big emoji, big temp, simple words -->
 	<button
 		onclick={() => (showEditor = true)}
-		class="flex flex-col items-end gap-1 group text-right"
-		title="Click to change location"
+		class="flex items-center gap-6 group"
+		title="Tap to change location"
 	>
 		<!-- Current conditions -->
-		<div class="flex items-center gap-2">
-			<span class="text-4xl leading-none">{data.current.emoji}</span>
-			<span class="text-4xl font-thin text-white leading-none">
+		<div class="flex flex-col items-center gap-1">
+			<span class="text-5xl leading-none">{data.current.emoji}</span>
+			<span class="text-3xl font-semibold text-white leading-none tabular-nums">
 				{data.current.temp}°{data.unit === 'fahrenheit' ? 'F' : 'C'}
 			</span>
-		</div>
-		<div class="text-sm text-slate-400">
-			{data.current.label} · Feels {data.current.feelsLike}°
-		</div>
-		<div class="text-xs text-slate-500 group-hover:text-slate-400 transition-colors">
-			{data.city}
+			<span class="text-sm font-medium text-slate-300">{simpleLabel(data.current.label)}</span>
+			<span class="text-xs text-slate-500 group-hover:text-slate-400 transition-colors">{data.city}</span>
 		</div>
 
-		<!-- 3-day forecast -->
-		<div class="flex gap-3 mt-1">
+		<!-- Divider -->
+		<div class="w-px h-20 bg-slate-700"></div>
+
+		<!-- 3-day forecast tiles -->
+		<div class="flex gap-4">
 			{#each data.forecast as day (day.date)}
-				<div class="flex flex-col items-center gap-0.5">
-					<span class="text-xs text-slate-500">{dayName(day.date)}</span>
-					<span class="text-base leading-none">{day.emoji}</span>
-					<span class="text-xs text-slate-300">{day.high}°</span>
+				<div class="flex flex-col items-center gap-1">
+					<span class="text-xs font-semibold text-slate-400 uppercase tracking-wide">{dayName(day.date)}</span>
+					<span class="text-3xl leading-none">{day.emoji}</span>
+					<span class="text-sm font-semibold text-white">{day.high}°</span>
 					<span class="text-xs text-slate-500">{day.low}°</span>
 				</div>
 			{/each}
