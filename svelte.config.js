@@ -7,7 +7,12 @@ const config = {
 		runes: ({ filename }) => filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 	},
 	kit: {
-		adapter: adapter(),
+		adapter: adapter({
+			platformProxy: {
+				// Disabled: miniflare requires macOS 13.5+; dev falls back to better-sqlite3
+				enabled: false
+			}
+		}),
 		typescript: {
 			config: (config) => ({
 				...config,
