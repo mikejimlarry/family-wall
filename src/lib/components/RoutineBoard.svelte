@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import type { Routine, RoutineCompletion, RoutinePeriod, Member } from '$lib/types';
 
 	type Props = {
@@ -24,7 +25,7 @@
 	];
 
 	// Which member is being viewed — global viewingAs takes priority
-	let internalMemberId = $state<string | null>(members[0]?.id ?? null);
+	let internalMemberId = $state<string | null>(untrack(() => members[0]?.id ?? null));
 	const activeMemberId = $derived(viewingAs ?? internalMemberId);
 
 	// Set of "routineId|memberId" that are done today
@@ -223,6 +224,7 @@
 				<!-- Inline add form -->
 				{#if addingPeriod === period.key}
 					<div class="flex gap-2 px-2 py-2 bg-slate-800 rounded-xl mt-1">
+						<!-- svelte:ignore a11y_autofocus -->
 						<input
 							type="text"
 							placeholder="Add a step…"

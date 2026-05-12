@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import {
 		type ThemeMode, type AutoType, type WeekSchedule,
 		DEFAULT_SCHEDULE, DAY_NAMES
@@ -15,10 +16,10 @@
 
 	let { initialMode, initialAutoType, initialSchedule, hasLocation, onSave, onClose }: Props = $props();
 
-	let mode     = $state<ThemeMode>(initialMode);
-	let autoType = $state<AutoType>(initialAutoType);
+	let mode     = $state<ThemeMode>(untrack(() => initialMode));
+	let autoType = $state<AutoType>(untrack(() => initialAutoType));
 	// Deep-copy so edits don't mutate parent state
-	let schedule = $state<WeekSchedule>(initialSchedule.map(d => ({ ...d })));
+	let schedule = $state<WeekSchedule>(untrack(() => initialSchedule.map(d => ({ ...d }))));
 
 	function handleKey(e: KeyboardEvent) {
 		if (e.key === 'Escape') onClose();
