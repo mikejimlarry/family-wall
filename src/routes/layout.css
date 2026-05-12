@@ -12,6 +12,7 @@ html, body {
 	color: #f1f5f9;
 	font-family: system-ui, -apple-system, sans-serif;
 	-webkit-font-smoothing: antialiased;
+	transition: background-color 0.4s ease, color 0.4s ease;
 }
 
 /* Hide scrollbar but keep scroll functionality */
@@ -30,3 +31,101 @@ html, body {
 button {
 	touch-action: manipulation;
 }
+
+/* Hide scrollbar utility */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+
+/* ═══════════════════════════════════════════════════════════
+   LIGHT THEME — applied when <html class="light">
+   Remaps every dark slate color used in the app to its
+   light equivalent while leaving accent colors (amber, green,
+   blue, red, violet) untouched.
+════════════════════════════════════════════════════════════ */
+html.light {
+	color-scheme: light;
+	background-color: #f8fafc;
+	color: #0f172a;
+}
+
+html.light ::-webkit-scrollbar-thumb {
+	background: #94a3b8;
+}
+
+/* ── Backgrounds ────────────────────────────────────────── */
+html.light .bg-slate-950  { background-color: #e2e8f0; }
+html.light .bg-slate-900  { background-color: #f8fafc; }
+html.light .bg-slate-800  { background-color: #ffffff; }
+html.light .bg-slate-700  { background-color: #f1f5f9; }
+html.light .bg-slate-600  { background-color: #e2e8f0; }
+
+html.light .bg-slate-900\/80 { background-color: rgb(248 250 252 / 0.95); }
+html.light .bg-slate-900\/60 { background-color: rgb(248 250 252 / 0.70); }
+html.light .bg-slate-800\/70 { background-color: rgb(255 255 255 / 0.80); }
+html.light .bg-slate-800\/60 { background-color: rgb(255 255 255 / 0.70); }
+html.light .bg-slate-800\/40 { background-color: rgb(255 255 255 / 0.50); }
+html.light .bg-slate-700\/60 { background-color: rgb(241 245 249 / 0.70); }
+html.light .bg-slate-700\/30 { background-color: rgb(148 163 184 / 0.45); }
+
+/* Lighter modal backdrops in light mode */
+html.light .bg-black\/70 { background-color: rgb(0 0 0 / 0.45); }
+html.light .bg-black\/60 { background-color: rgb(0 0 0 / 0.35); }
+
+/* ── Text ────────────────────────────────────────────────── */
+html.light .text-white     { color: #0f172a; }
+html.light .text-slate-200 { color: #1e293b; }
+html.light .text-slate-300 { color: #334155; }
+html.light .text-slate-400 { color: #475569; }
+html.light .text-slate-500 { color: #64748b; }
+html.light .text-slate-600 { color: #94a3b8; }
+html.light .text-slate-700 { color: #cbd5e1; }
+html.light .text-slate-900 { color: #0f172a; }
+
+/* ── Borders ─────────────────────────────────────────────── */
+html.light .border-slate-800      { border-color: #e2e8f0; }
+html.light .border-slate-800\/50  { border-color: rgb(226 232 240 / 0.6); }
+html.light .border-slate-800\/60  { border-color: rgb(226 232 240 / 0.7); }
+html.light .border-slate-700      { border-color: #e2e8f0; }
+html.light .border-slate-600      { border-color: #cbd5e1; }
+html.light .border-slate-500      { border-color: #94a3b8; }
+html.light .border-slate-400      { border-color: #64748b; }
+
+/* ── White text on colored action buttons stays white ────── */
+html.light .bg-blue-600.text-white,
+html.light .bg-green-600.text-white,
+html.light .bg-red-700.text-white  { color: #ffffff; }
+
+/* ── Placeholder ─────────────────────────────────────────── */
+html.light .placeholder-slate-500::placeholder { color: #94a3b8; }
+
+/* ── Focus rings ─────────────────────────────────────────── */
+html.light .focus\:ring-blue-500:focus { --tw-ring-color: #3b82f6; }
+
+/* ── Hover: backgrounds ──────────────────────────────────── */
+html.light .hover\:bg-slate-800:hover     { background-color: #f1f5f9; }
+html.light .hover\:bg-slate-800\/60:hover { background-color: rgb(241 245 249 / 0.70); }
+html.light .hover\:bg-slate-700:hover     { background-color: #e2e8f0; }
+html.light .hover\:bg-slate-600:hover     { background-color: #cbd5e1; }
+
+/* ── Hover: text ─────────────────────────────────────────── */
+html.light .hover\:text-white:hover     { color: #0f172a; }
+html.light .hover\:text-slate-200:hover { color: #1e293b; }
+html.light .hover\:text-slate-300:hover { color: #334155; }
+html.light .hover\:text-slate-400:hover { color: #475569; }
+html.light .hover\:text-slate-600:hover { color: #94a3b8; }
+
+/* ── Date input color-scheme ─────────────────────────────── */
+html.light .\[color-scheme\:dark\] { color-scheme: light; }
+
+/* ── Divide lines ────────────────────────────────────────── */
+html.light .divide-slate-700 > :not([hidden]) ~ :not([hidden]) { border-color: #e2e8f0; }
+html.light .divide-red-900\/40 > :not([hidden]) ~ :not([hidden]) { border-color: rgb(254 202 202 / 0.4); }
+
+/* ══════════════════════════════════════════════════════════
+   SLEEP OVERLAY — always stays dark regardless of theme
+══════════════════════════════════════════════════════════ */
+html.light .sleep-overlay               { background-color: #020617 !important; }
+html.light .sleep-overlay .text-white   { color: #ffffff; }
+html.light .sleep-overlay .text-slate-500 { color: #475569; }
+html.light .sleep-overlay .bg-slate-950 { background-color: #020617; }

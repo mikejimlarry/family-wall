@@ -4,12 +4,13 @@
 
 	type Props = {
 		members: Member[];
-		chore?: Chore | null; // if provided → edit mode
+		chore?: Chore | null;
 		onSave: (data: {
 			title: string;
-			assignedTo: string | null;
+			assignedTo: string[];
 			dueDate: string | null;
 			recurrence: string | null;
+			points: number;
 		}) => void;
 		onClose: () => void;
 	};
@@ -18,26 +19,32 @@
 
 	const isEdit = $derived(Boolean(chore));
 
-	// Snapshot prop for form initialization
 	const c = untrack(() => chore);
 	let title      = $state(c?.title ?? '');
-	let assignedTo = $state(c?.assignedTo ?? '');
+	let assignedTo = $state<string[]>(c?.assignedTo ?? []);
 	let dueDate    = $state(c?.dueDate ?? '');
 	let recurrence = $state(c?.recurrence ?? '');
+	let points     = $state(c?.points ?? 1);
+
+	function toggleMember(id: string) {
+		assignedTo = assignedTo.includes(id)
+			? assignedTo.filter(x => x !== id)
+			: [...assignedTo, id];
+	}
 
 	function submit() {
 		if (!title.trim()) return;
 		onSave({
 			title: title.trim(),
-			assignedTo: assignedTo || null,
+			assignedTo,
 			dueDate: dueDate || null,
-			recurrence: recurrence || null
+			recurrence: recurrence || null,
+			points
 		});
 	}
 
 	function handleKey(e: KeyboardEvent) {
 		if (e.key === 'Escape') onClose();
-		if (e.key === 'Enter' && title.trim()) submit();
 	}
 </script>
 
@@ -71,18 +78,29 @@
 		/>
 
 		{#if members.length > 0}
-			<div class="flex flex-col gap-1">
-				<label for="chore-assigned" class="text-xs text-slate-400">Assign to</label>
-				<select
-					id="chore-assigned"
-					bind:value={assignedTo}
-					class="bg-slate-700 text-white rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-				>
-					<option value="">Everyone</option>
-					{#each members as member (member.id)}
-						<option value={member.id}>{member.name}</option>
+			<div class="flex flex-col gap-2">
+				<span class="text-xs text-slate-400">Assign to</span>
+				<div class="flex flex-wrap gap-2">
+					{#each members as m (m.id)}
+						{@const selected = assignedTo.includes(m.id)}
+						<button
+							type="button"
+							onclick={() => toggleMember(m.id)}
+							class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all"
+							style="background-color: {selected ? m.color : 'transparent'}20;
+							       color: {selected ? m.color : '#94a3b8'};
+							       border: 2px solid {selected ? m.color : '#334155'};"
+							aria-pressed={selected}
+						>
+							<span>{m.emoji ?? '👤'}</span>
+							<span>{m.name}</span>
+							{#if selected}<span class="text-xs">✓</span>{/if}
+						</button>
 					{/each}
-				</select>
+				</div>
+				{#if assignedTo.length === 0}
+					<p class="text-xs text-slate-500 italic">No one selected — chore is for everyone</p>
+				{/if}
 			</div>
 		{/if}
 
@@ -108,6 +126,25 @@
 					<option value="weekly">Weekly</option>
 					<option value="monthly">Monthly</option>
 				</select>
+			</div>
+		</div>
+
+		<!-- Points -->
+		<div class="flex flex-col gap-1" role="group" aria-label="Points when done">
+			<span class="text-xs text-slate-400">⭐ Points when done</span>
+			<div class="flex items-center gap-3">
+				<button
+					type="button"
+					onclick={() => { if (points > 1) points--; }}
+					class="w-10 h-10 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-xl font-bold transition-colors flex items-center justify-center"
+				>−</button>
+				<span class="text-2xl font-bold text-white w-8 text-center tabular-nums">{points}</span>
+				<button
+					type="button"
+					onclick={() => { if (points < 10) points++; }}
+					class="w-10 h-10 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-xl font-bold transition-colors flex items-center justify-center"
+				>+</button>
+				<span class="text-xs text-slate-500 ml-1">{points === 1 ? 'point' : 'points'}</span>
 			</div>
 		</div>
 

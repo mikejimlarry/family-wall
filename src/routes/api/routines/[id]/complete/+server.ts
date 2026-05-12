@@ -1,0 +1,39 @@
+import { json } from '@sveltejs/kit';
+import type { RequestHandler } from './$types';
+import { getDatabase } from '$lib/server/db';
+import { routineCompletions } from '$lib/server/db/schema';
+import { and, eq, isNull } from 'drizzle-orm';
+
+/** POST — mark a routine done for a given date + member */
+export const POST: RequestHandler = async ({ params, request, platform }) => {
+	const db = await getDatabase(platform);
+	const body = await request.json() as { date: string; memberId: string | null };
+
+	const [row] = await db
+		.insert(routineCompletions)
+		.values({ routineId: params.id, memberId: body.memberId, date: body.date })
+		.onConflictDoNothing()
+		.returning();
+
+	return json(row ?? { routineId: params.id, memberId: body.memberId, date: body.date }, { status: 201 });
+};
+
+/** DELETE — unmark a routine for a given date + member */
+export const DELETE: RequestHandler = async ({ params, request, platform }) => {
+	const db = await getDatabase(platform);
+	const body = await request.json() as { date: string; memberId: string | null };
+
+	const memberClause = body.memberId
+		? eq(routineCompletions.memberId, body.memberId)
+		: isNull(routineCompletions.memberId);
+
+	await db.delete(routineCompletions).where(
+		and(
+			eq(routineCompletions.routineId, params.id),
+			eq(routineCompletions.date, body.date),
+			memberClause
+		)
+	);
+
+	return json({ ok: true });
+};

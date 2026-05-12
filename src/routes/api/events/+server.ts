@@ -29,6 +29,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 		endDate?: string;
 		allDay?: boolean;
 		memberId?: string;
+		recurrenceRule?: string | null;
 	};
 
 	if (!body.title?.trim() || !body.startDate) {
@@ -43,6 +44,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 			endDate: body.endDate ?? null,
 			allDay: body.allDay ?? true,
 			memberId: body.memberId ?? null,
+			recurrenceRule: body.recurrenceRule ?? null,
 			source: 'manual'
 		})
 		.returning();

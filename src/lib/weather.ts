@@ -18,7 +18,7 @@ export type WeatherDay = {
 
 export type WeatherData = {
 	current: WeatherCurrent;
-	forecast: WeatherDay[]; // next 3 days (excludes today)
+	forecast: WeatherDay[]; // next 5 days (excludes today)
 	city: string;
 	unit: 'fahrenheit' | 'celsius';
 	fetchedAt: number;
@@ -74,7 +74,7 @@ export async function fetchWeather(config: WeatherConfig): Promise<WeatherData> 
 	url.searchParams.set('temperature_unit', unit);
 	url.searchParams.set('wind_speed_unit', 'mph');
 	url.searchParams.set('timezone', 'auto');
-	url.searchParams.set('forecast_days', '4');
+	url.searchParams.set('forecast_days', '7');
 
 	const res = await fetch(url.toString());
 	if (!res.ok) throw new Error(`Open-Meteo error: ${res.status}`);
@@ -105,13 +105,14 @@ export async function fetchWeather(config: WeatherConfig): Promise<WeatherData> 
 		...wmo(code)
 	};
 
-	// daily[0] is today; we want the next 3 days
-	const forecast: WeatherDay[] = raw.daily.time.slice(1, 4).map((date, i) => {
-		const dayCode = raw.daily.weather_code[i + 1];
+	// daily[0] is today; we want the next 5 days
+	const forecast: WeatherDay[] = raw.daily.time.slice(1, 6).map((date, i) => {
+		const idx = i + 1;
+		const dayCode = raw.daily.weather_code[idx];
 		return {
 			date,
-			high: Math.round(raw.daily.temperature_2m_max[i + 1]),
-			low: Math.round(raw.daily.temperature_2m_min[i + 1]),
+			high: Math.round(raw.daily.temperature_2m_max[idx]),
+			low: Math.round(raw.daily.temperature_2m_min[idx]),
 			code: dayCode,
 			emoji: wmo(dayCode).emoji
 		};

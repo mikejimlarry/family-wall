@@ -11,6 +11,7 @@ export const PATCH: RequestHandler = async ({ params, request, platform }) => {
 		color?: string;
 		emoji?: string;
 		birthday?: string | null;
+		role?: string;
 	};
 
 	const updates: Partial<typeof familyMembers.$inferInsert> = {};
@@ -18,6 +19,9 @@ export const PATCH: RequestHandler = async ({ params, request, platform }) => {
 	if ('color' in body) updates.color = body.color;
 	if ('emoji' in body) updates.emoji = body.emoji;
 	if ('birthday' in body) updates.birthday = body.birthday ?? null;
+	if ('role' in body && ['parent', 'child', 'guest'].includes(body.role ?? '')) {
+		updates.role = body.role as 'parent' | 'child' | 'guest';
+	}
 
 	const [updated] = await db
 		.update(familyMembers)

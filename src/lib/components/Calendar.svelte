@@ -1,5 +1,6 @@
 <script lang="ts">
-	import type { CalendarEvent, Member } from '$lib/types';
+	import type { CalendarEvent, Member, CalendarFeed } from '$lib/types';
+	import { expandRecurring } from '$lib/utils/recurrence';
 	import { onMount } from 'svelte';
 
 	type CalendarView = 'day' | 'week' | 'month' | 'year';
@@ -7,12 +8,13 @@
 	type Props = {
 		events: CalendarEvent[];
 		members: Member[];
+		feeds: CalendarFeed[];
 		adminMode: boolean;
 		onAddEvent: (date: string) => void;
 		onDeleteEvent: (id: string) => void;
 	};
 
-	let { events, members, adminMode, onAddEvent, onDeleteEvent }: Props = $props();
+	let { events, members, feeds = [], adminMode, onAddEvent, onDeleteEvent }: Props = $props();
 
 	const HOUR_HEIGHT = 56; // px per hour in the day timeline
 	const HOURS = Array.from({ length: 24 }, (_, i) => i);
@@ -32,9 +34,16 @@
 	const todayStr = new Date().toISOString().split('T')[0];
 
 	const memberMap = $derived(new Map(members.map((m) => [m.id, m])));
-	const filteredEvents = $derived(
-		activeMemberId ? events.filter((e) => e.memberId === activeMemberId) : events
-	);
+	const feedMap   = $derived(new Map(feeds.map((f) => [f.id, f])));
+
+	// Expand window: 1 year back → 2 years forward
+	const expandWinStart = new Date(new Date().getFullYear() - 1, 0, 1);
+	const expandWinEnd   = new Date(new Date().getFullYear() + 2, 11, 31);
+
+	const filteredEvents = $derived.by(() => {
+		const base = activeMemberId ? events.filter((e) => e.memberId === activeMemberId) : events;
+		return expandRecurring(base, expandWinStart, expandWinEnd);
+	});
 
 	// ── Day timeline ──────────────────────────────────────────────
 
@@ -122,11 +131,21 @@
 	}
 
 	function eventsForDate(dateStr: string): CalendarEvent[] {
-		return filteredEvents.filter((e) => e.startDate === dateStr);
+		return filteredEvents.filter((e) => e.startDate.startsWith(dateStr));
+	}
+
+	// Virtual recurring instances have IDs like `{realId}_{YYYY-MM-DD}` — strip the suffix
+	function realEventId(id: string): string {
+		return id.replace(/_\d{4}-\d{2}-\d{2}$/, '');
 	}
 
 	function eventColor(event: CalendarEvent): string {
 		if (event.memberId) return memberMap.get(event.memberId)?.color ?? '#60a5fa';
+		if (event.source === 'ical' && event.externalId) {
+			const feedId = event.externalId.split(':')[0];
+			const feed = feedMap.get(feedId);
+			if (feed) return feed.color;
+		}
 		return '#94a3b8';
 	}
 
@@ -207,7 +226,7 @@
 		<!-- Navigation -->
 		<button
 			onclick={prev}
-			class="w-7 h-7 flex items-center justify-center rounded-full text-slate-400 hover:text-white hover:bg-slate-700 transition-colors text-lg leading-none"
+			class="w-10 h-10 flex items-center justify-center rounded-full text-slate-400 hover:text-white hover:bg-slate-700 transition-colors text-xl leading-none"
 		>‹</button>
 
 		<h2 class="text-base font-semibold text-white min-w-[160px] text-center">
@@ -216,12 +235,12 @@
 
 		<button
 			onclick={next}
-			class="w-7 h-7 flex items-center justify-center rounded-full text-slate-400 hover:text-white hover:bg-slate-700 transition-colors text-lg leading-none"
+			class="w-10 h-10 flex items-center justify-center rounded-full text-slate-400 hover:text-white hover:bg-slate-700 transition-colors text-xl leading-none"
 		>›</button>
 
 		<button
 			onclick={goToday}
-			class="text-xs px-2.5 py-1 rounded-full bg-slate-700 hover:bg-slate-600 text-slate-400 hover:text-white transition-colors ml-1"
+			class="text-sm px-3 py-2 rounded-full bg-slate-700 hover:bg-slate-600 text-slate-400 hover:text-white transition-colors ml-1"
 		>Today</button>
 
 		<!-- View tabs -->
@@ -229,7 +248,7 @@
 			{#each (['day', 'week', 'month', 'year'] as const) as v}
 				<button
 					onclick={() => switchView(v)}
-					class="px-3 py-1 rounded-full text-xs font-medium capitalize transition-colors {currentView === v
+					class="px-3 py-2 rounded-full text-sm font-medium capitalize transition-colors {currentView === v
 						? 'bg-slate-600 text-white'
 						: 'text-slate-500 hover:text-slate-300'}"
 				>{v}</button>
@@ -240,14 +259,14 @@
 		<div class="flex items-center gap-1.5 ml-auto flex-wrap">
 			<button
 				onclick={() => (activeMemberId = null)}
-				class="px-2.5 py-1 rounded-full text-xs font-medium transition-colors {activeMemberId === null
+				class="px-3 py-1.5 rounded-full text-sm font-medium transition-colors {activeMemberId === null
 					? 'bg-slate-500 text-white'
 					: 'bg-slate-800 text-slate-400 hover:bg-slate-700'}"
 			>All</button>
 			{#each members as member (member.id)}
 				<button
 					onclick={() => (activeMemberId = activeMemberId === member.id ? null : member.id)}
-					class="px-2.5 py-1 rounded-full text-xs font-medium transition-colors"
+					class="px-3 py-1.5 rounded-full text-sm font-medium transition-colors"
 					style="background-color: {activeMemberId === member.id ? member.color : 'transparent'}; color: {activeMemberId === member.id ? '#fff' : member.color}; border: 1px solid {member.color};"
 				>{member.name}</button>
 			{/each}
@@ -308,7 +327,7 @@
 					{#if adminMode}
 						<button
 							onclick={() => onAddEvent(selectedDate!)}
-							class="text-xs px-3 py-1 rounded-full bg-blue-600 hover:bg-blue-500 text-white transition-colors"
+							class="text-sm px-4 py-2 rounded-full bg-blue-600 hover:bg-blue-500 text-white transition-colors font-medium"
 						>+ Add event</button>
 					{/if}
 				</div>
@@ -326,8 +345,8 @@
 							</span>
 						{/if}
 						{#if adminMode && event.source !== 'birthday'}
-							<button onclick={() => onDeleteEvent(event.id)}
-								class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 text-xs transition-opacity">✕</button>
+							<button onclick={() => onDeleteEvent(realEventId(event.id))}
+								class="opacity-0 group-hover:opacity-100 w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:text-red-400 hover:bg-slate-700 transition-all">✕</button>
 						{/if}
 					</div>
 				{/each}
@@ -374,7 +393,7 @@
 								>{event.title}</span>
 								{#if adminMode && event.source !== 'birthday'}
 									<button
-										onclick={() => onDeleteEvent(event.id)}
+										onclick={() => onDeleteEvent(realEventId(event.id))}
 										class="absolute top-0.5 right-0.5 opacity-0 group-hover:opacity-100 text-[9px] text-slate-500 hover:text-red-400 transition-opacity leading-none"
 									>✕</button>
 								{/if}
@@ -413,7 +432,7 @@
 							>{event.title}</span>
 							{#if adminMode && event.source !== 'birthday'}
 								<button
-									onclick={() => onDeleteEvent(event.id)}
+									onclick={() => onDeleteEvent(realEventId(event.id))}
 									class="opacity-0 group-hover:opacity-100 text-slate-600 hover:text-red-400 text-[10px] transition-opacity leading-none"
 									aria-label="Delete event"
 								>✕</button>

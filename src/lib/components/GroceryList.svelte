@@ -19,7 +19,7 @@
 	const checked   = $derived(items.filter((i) => i.checked).sort((a, b) => {
 		const aT = a.checkedAt ? new Date(a.checkedAt).getTime() : 0;
 		const bT = b.checkedAt ? new Date(b.checkedAt).getTime() : 0;
-		return bT - aT; // most recently checked first
+		return bT - aT;
 	}));
 
 	function submitAdd() {
@@ -35,17 +35,17 @@
 	}
 </script>
 
-<div class="flex flex-col h-full gap-3">
+<div class="flex flex-col h-full gap-4">
 	<!-- Header -->
 	<div class="flex items-center justify-between">
 		<div class="flex items-center gap-2">
 			<h2 class="text-xl font-semibold text-white">Grocery</h2>
 			{#if unchecked.length > 0}
-				<span class="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-medium">
+				<span class="text-xs px-2 py-1 rounded-full bg-amber-500/20 text-amber-400 font-medium">
 					{unchecked.length} left
 				</span>
 			{:else if items.length > 0}
-				<span class="text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 font-medium">
+				<span class="text-xs px-2 py-1 rounded-full bg-green-500/20 text-green-400 font-medium">
 					All got!
 				</span>
 			{/if}
@@ -53,14 +53,14 @@
 		{#if adminMode && checked.length > 0}
 			<button
 				onclick={onClearChecked}
-				class="text-xs px-3 py-1.5 rounded-full bg-slate-700 hover:bg-slate-600 text-slate-400 hover:text-white transition-colors"
+				class="text-sm px-4 py-2.5 rounded-full bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white transition-colors"
 			>
 				Clear checked
 			</button>
 		{/if}
 	</div>
 
-	<!-- Add item input (always visible) -->
+	<!-- Add item input -->
 	<div class="flex gap-2">
 		<input
 			bind:this={inputEl}
@@ -68,12 +68,12 @@
 			onkeydown={handleKey}
 			type="text"
 			placeholder="Add an item…"
-			class="flex-1 bg-slate-800 border border-slate-700 focus:border-slate-500 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 outline-none focus:ring-1 focus:ring-blue-500 transition-colors"
+			class="flex-1 bg-slate-800 border border-slate-700 focus:border-slate-500 rounded-xl px-4 py-3 text-base text-white placeholder-slate-500 outline-none focus:ring-1 focus:ring-blue-500 transition-colors"
 		/>
 		<button
 			onclick={submitAdd}
 			disabled={!newItem.trim()}
-			class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors shrink-0"
+			class="px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-colors shrink-0"
 		>Add</button>
 	</div>
 
@@ -87,17 +87,17 @@
 
 		<!-- Unchecked -->
 		{#each unchecked as item (item.id)}
-			<div class="group flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-800/60 transition-colors">
+			<div class="group flex items-center gap-3 px-2 py-3 rounded-xl border border-slate-800 hover:bg-slate-800/60 transition-colors">
 				<button
 					onclick={() => onCheck(item.id, true)}
-					class="w-5 h-5 rounded border-2 border-slate-500 hover:border-green-400 transition-colors shrink-0 flex items-center justify-center"
+					class="w-8 h-8 rounded-lg border-2 border-slate-500 hover:border-green-400 transition-colors shrink-0 flex items-center justify-center"
 					aria-label="Mark as got"
 				></button>
-				<span class="flex-1 text-sm text-slate-200">{item.name}</span>
+				<span class="flex-1 text-base text-slate-200">{item.name}</span>
 				{#if adminMode}
 					<button
 						onclick={() => onDelete(item.id)}
-						class="opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center text-slate-600 hover:text-red-400 transition-opacity text-xs"
+						class="opacity-0 group-hover:opacity-100 w-9 h-9 flex items-center justify-center rounded-lg text-slate-600 hover:text-red-400 hover:bg-slate-700 transition-all text-sm"
 						aria-label="Delete item"
 					>✕</button>
 				{/if}
@@ -106,19 +106,19 @@
 
 		<!-- Checked -->
 		{#if checked.length > 0}
-			<div class="mt-2 mb-1 text-xs text-slate-700 font-medium px-1">✓ In the cart</div>
+			<div class="mt-2 mb-1 text-xs text-slate-700 font-medium px-2">✓ In the cart</div>
 			{#each checked as item (item.id)}
-				<div class="group flex items-center gap-3 p-2.5 rounded-xl transition-colors">
+				<div class="group flex items-center gap-3 px-2 py-3 rounded-xl border border-slate-800 transition-colors">
 					<button
 						onclick={() => onCheck(item.id, false)}
-						class="w-5 h-5 rounded border-2 border-green-700 bg-green-700/30 shrink-0 flex items-center justify-center text-green-600 text-xs transition-colors hover:border-slate-500 hover:bg-transparent hover:text-slate-600"
+						class="w-8 h-8 rounded-lg border-2 border-green-700 bg-green-700/30 shrink-0 flex items-center justify-center text-green-600 text-sm transition-colors hover:border-slate-500 hover:bg-transparent hover:text-slate-600"
 						aria-label="Uncheck"
 					>✓</button>
-					<span class="flex-1 text-sm text-slate-600 line-through">{item.name}</span>
+					<span class="flex-1 text-base text-slate-600 line-through">{item.name}</span>
 					{#if adminMode}
 						<button
 							onclick={() => onDelete(item.id)}
-							class="opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center text-slate-700 hover:text-red-400 transition-opacity text-xs"
+							class="opacity-0 group-hover:opacity-100 w-9 h-9 flex items-center justify-center rounded-lg text-slate-700 hover:text-red-400 hover:bg-slate-700 transition-all text-sm"
 							aria-label="Delete item"
 						>✕</button>
 					{/if}

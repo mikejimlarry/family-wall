@@ -204,8 +204,8 @@
 		<!-- Divider -->
 		<div class="w-px h-20 bg-slate-700"></div>
 
-		<!-- 3-day forecast tiles -->
-		<div class="flex gap-4">
+		<!-- 5-day forecast tiles -->
+		<div class="flex gap-3">
 			{#each data.forecast as day (day.date)}
 				<div class="flex flex-col items-center gap-1">
 					<span class="text-xs font-semibold text-slate-400 uppercase tracking-wide">{dayName(day.date)}</span>

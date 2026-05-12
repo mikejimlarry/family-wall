@@ -35,7 +35,18 @@ function applyMigrations(sqlite: ReturnType<typeof Database>) {
 			.map((s) => s.trim())
 			.filter(Boolean);
 		for (const stmt of statements) {
-			sqlite.exec(stmt);
+			try {
+				sqlite.exec(stmt);
+			} catch (e: unknown) {
+				const msg = e instanceof Error ? e.message : String(e);
+				// Skip statements that were already applied (e.g. from a manually
+				// created migration that was later replaced by drizzle-kit generate)
+				if (msg.includes('already exists') || msg.includes('duplicate column name')) {
+					console.warn(`[dev-db] Skipping already-applied statement in ${file}: ${msg}`);
+				} else {
+					throw e;
+				}
+			}
 		}
 		sqlite.prepare('INSERT INTO __drizzle_migrations (name, applied_at) VALUES (?, ?)').run(
 			file,
@@ -75,10 +86,10 @@ function applyMigrations(sqlite: ReturnType<typeof Database>) {
 		const now = Date.now();
 		sqlite
 			.prepare(`INSERT OR IGNORE INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)`)
-			.run('weather.lat', '39.1732', now);
+			.run('weather.lat', '39.1873', now);
 		sqlite
 			.prepare(`INSERT OR IGNORE INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)`)
-			.run('weather.lon', '-77.2717', now);
+			.run('weather.lon', '-77.2624', now);
 		sqlite
 			.prepare(`INSERT OR IGNORE INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)`)
 			.run('weather.city', 'Germantown, MD', now);

@@ -1,0 +1,1 @@
+ALTER TABLE `family_members` ADD `role` text DEFAULT 'child' NOT NULL;

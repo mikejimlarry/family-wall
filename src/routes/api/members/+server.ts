@@ -11,11 +11,15 @@ export const GET: RequestHandler = async ({ platform }) => {
 
 export const POST: RequestHandler = async ({ request, platform }) => {
 	const db = await getDatabase(platform);
-	const body = await request.json() as { name?: string; color?: string; emoji?: string; birthday?: string };
+	const body = await request.json() as { name?: string; color?: string; emoji?: string; birthday?: string; role?: string };
 
 	if (!body.name?.trim()) {
 		return json({ error: 'Name is required' }, { status: 400 });
 	}
+
+	const role = (['parent', 'child', 'guest'] as const).includes(body.role as 'parent' | 'child' | 'guest')
+		? (body.role as 'parent' | 'child' | 'guest')
+		: 'child';
 
 	const [member] = await db
 		.insert(familyMembers)
@@ -23,7 +27,8 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 			name: body.name.trim(),
 			color: body.color ?? '#60a5fa',
 			emoji: body.emoji ?? '👤',
-			birthday: body.birthday ?? null
+			birthday: body.birthday ?? null,
+			role
 		})
 		.returning();
 

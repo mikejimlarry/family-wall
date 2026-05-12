@@ -1,10 +1,12 @@
 import type { PageServerLoad } from './$types';
 import { getDatabase } from '$lib/server/db';
-import { familyMembers, chores, events, appSettings, groceryItems, mealPlan } from '$lib/server/db/schema';
-import { and, gte, lte } from 'drizzle-orm';
+import { familyMembers, chores, events, appSettings, groceryItems, mealPlan, messages, calendarFeeds, routines, routineCompletions } from '$lib/server/db/schema';
+import { and, gte, lte, desc, eq, asc } from 'drizzle-orm';
+import { syncFeed } from '$lib/server/ical-sync';
 import type { WeatherData } from '$lib/weather';
 
-const CACHE_TTL_MS = 10 * 60 * 1000;
+const CACHE_TTL_MS     = 10 * 60 * 1000;
+const FEED_SYNC_TTL_MS = 30 * 60 * 1000; // re-sync feeds every 30 min
 
 export const load: PageServerLoad = async ({ platform }) => {
 	const db = await getDatabase(platform);
@@ -22,7 +24,15 @@ export const load: PageServerLoad = async ({ platform }) => {
 	const mealStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 28).toISOString().split('T')[0];
 	const mealEnd   = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 56).toISOString().split('T')[0];
 
-	const [members, allChores, allEvents, settingsRows, allGrocery, allMeals] = await Promise.all([
+	// Local date string (avoids UTC-offset skew from toISOString())
+	const todayStr = (() => {
+		const y = now.getFullYear();
+		const m = String(now.getMonth() + 1).padStart(2, '0');
+		const d = String(now.getDate()).padStart(2, '0');
+		return `${y}-${m}-${d}`;
+	})();
+
+	const [members, allChores, allEvents, settingsRows, allGrocery, allMeals, allMessages, feeds, allRoutines, todayCompletions] = await Promise.all([
 		db.select().from(familyMembers),
 		db.select().from(chores),
 		db
@@ -31,10 +41,28 @@ export const load: PageServerLoad = async ({ platform }) => {
 			.where(and(gte(events.startDate, rangeStart), lte(events.startDate, rangeEnd))),
 		db.select().from(appSettings),
 		db.select().from(groceryItems),
-		db.select().from(mealPlan).where(and(gte(mealPlan.date, mealStart), lte(mealPlan.date, mealEnd)))
+		db.select().from(mealPlan).where(and(gte(mealPlan.date, mealStart), lte(mealPlan.date, mealEnd))),
+		db.select().from(messages).orderBy(desc(messages.pinned), desc(messages.createdAt)),
+		db.select().from(calendarFeeds),
+		db.select().from(routines).orderBy(asc(routines.sortOrder), asc(routines.createdAt)),
+		db.select().from(routineCompletions).where(eq(routineCompletions.date, todayStr))
 	]);
 
+	// Auto-sync stale calendar feeds (don't await — fire-and-forget so page load stays fast)
+	const staleFeeds = feeds.filter(f =>
+		!f.lastSyncedAt || (Date.now() - new Date(f.lastSyncedAt).getTime() > FEED_SYNC_TTL_MS)
+	);
+	if (staleFeeds.length > 0) {
+		Promise.all(staleFeeds.map(f => syncFeed(db, f).catch(() => null)));
+	}
+
 	const s = Object.fromEntries(settingsRows.map((r) => [r.key, r.value]));
+
+	// Expose raw theme-related settings to the client for initial render
+	const themeSettings: Record<string, string> = {};
+	for (const key of ['theme.mode', 'theme.auto_type', 'theme.schedule', 'weather.lat', 'weather.lon']) {
+		if (s[key] != null) themeSettings[key] = s[key];
+	}
 
 	// Serve weather from cache if fresh; otherwise let the client-side widget fetch it
 	let weather: WeatherData | null = null;
@@ -74,12 +102,24 @@ export const load: PageServerLoad = async ({ platform }) => {
 		}
 	}
 
+	function parseAssignees(raw: string | null): string[] {
+		if (!raw) return [];
+		try { const v = JSON.parse(raw); return Array.isArray(v) ? v : [v]; }
+		catch { return [raw]; }
+	}
+
 	return {
 		members,
-		chores: allChores,
+		chores: allChores.map(c => ({ ...c, assignedTo: parseAssignees(c.assignedTo) })),
 		events: [...allEvents, ...birthdayEvents],
 		grocery: allGrocery,
 		meals: allMeals,
+		messages: allMessages,
+		feeds,
+		routines: allRoutines,
+		completions: todayCompletions,
+		todayStr,
+		themeSettings,
 		weather,
 		hasWeatherLocation
 	};
