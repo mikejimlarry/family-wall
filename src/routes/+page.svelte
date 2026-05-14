@@ -15,11 +15,16 @@
 	import MealPlanPanel from '$lib/components/MealPlan.svelte';
 	import MessageBoard from '$lib/components/MessageBoard.svelte';
 	import SleepOverlay from '$lib/components/SleepOverlay.svelte';
+	import MeshBackground from '$lib/components/MeshBackground.svelte';
+	import AgendaStrip from '$lib/components/AgendaStrip.svelte';
 	import CalFeedManager from '$lib/components/CalFeedManager.svelte';
 	import RoutineBoard from '$lib/components/RoutineBoard.svelte';
 	import ThemeSettings from '$lib/components/ThemeSettings.svelte';
 	import { resolveTheme, parseThemeSettings, DEFAULT_SCHEDULE } from '$lib/utils/theme';
 	import type { ThemeMode, AutoType, WeekSchedule } from '$lib/utils/theme';
+	import { apiFetch } from '$lib/api';
+	import { browser } from '$app/environment';
+	import { flushQueuedMutations, onOfflineQueueChange, queueMutation, queuedMutationCount } from '$lib/offline';
 
 	let { data }: { data: PageData } = $props();
 
@@ -84,15 +89,19 @@
 		themeMode     = mode;
 		themeAutoType = autoType;
 		themeSchedule = schedule;
-		await fetch('/api/settings', {
-			method: 'PATCH',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				'theme.mode':      mode,
-				'theme.auto_type': autoType,
-				'theme.schedule':  JSON.stringify(schedule),
-			}),
-		});
+		try {
+			await apiFetch('/api/settings', {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					'theme.mode':      mode,
+					'theme.auto_type': autoType,
+					'theme.schedule':  JSON.stringify(schedule),
+				}),
+			});
+		} catch (err) {
+			reportError(err);
+		}
 	}
 	// ──────────────────────────────────────────────────────────────────────────
 
@@ -107,6 +116,11 @@
 	let showAddMember = $state(false);
 	let eventModalDate = $state<string | undefined>(undefined);
 	let showFeedManager = $state(false);
+	let showAdminMenu   = $state(false);
+	let adminMenuEl     = $state<HTMLDivElement | null>(null);
+	let actionError     = $state('');
+	let isOnline        = $state(true);
+	let offlineQueued   = $state(0);
 
 	// --- Sleep mode ---
 	const SLEEP_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
@@ -119,12 +133,38 @@
 				sleep();
 			}
 		}, 10_000);
-		return () => clearInterval(id);
+		const refreshOfflineState = () => {
+			isOnline = navigator.onLine;
+			offlineQueued = queuedMutationCount();
+			if (navigator.onLine) flushQueuedMutations().then((count) => (offlineQueued = count));
+		};
+		refreshOfflineState();
+		const unsubscribe = onOfflineQueueChange(refreshOfflineState);
+		return () => {
+			clearInterval(id);
+			unsubscribe();
+		};
 	});
 
 	function sleep() { sleeping = true; adminMode = false; }
 	function recordActivity() { lastActivity = Date.now(); }
 	function wake() { sleeping = false; lastActivity = Date.now(); }
+
+	function reportError(err: unknown) {
+		actionError = err instanceof Error ? err.message : 'Something went wrong';
+		setTimeout(() => {
+			actionError = '';
+		}, 5000);
+	}
+
+	function queueOffline(url: string, init: { method: string; headers?: Record<string, string>; body?: string }) {
+		if (!browser) return;
+		offlineQueued = queueMutation(url, init);
+		actionError = 'Offline change saved. It will sync when the wall reconnects.';
+		setTimeout(() => {
+			actionError = '';
+		}, 5000);
+	}
 
 	// --- Countdown strip ---
 
@@ -155,7 +195,14 @@
 
 	// --- Admin mode ---
 	function unlock() { adminMode = true; }
-	function lock()   { adminMode = false; }
+	async function lock() {
+		adminMode = false;
+		try {
+			await apiFetch('/api/admin', { method: 'DELETE' });
+		} catch (err) {
+			reportError(err);
+		}
+	}
 
 	// --- Event handlers ---
 
@@ -172,21 +219,26 @@
 		memberId: string | null;
 		recurrenceRule: string | null;
 	}) {
-		const res = await fetch('/api/events', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(payload)
-		});
-		if (res.ok) {
-			const event: CalendarEvent = await res.json();
+		try {
+			const event = await apiFetch<CalendarEvent>('/api/events', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(payload)
+			});
 			events = [...events, event];
+			showEventModal = false;
+		} catch (err) {
+			reportError(err);
 		}
-		showEventModal = false;
 	}
 
 	async function deleteEvent(id: string) {
-		const res = await fetch(`/api/events/${id}`, { method: 'DELETE' });
-		if (res.ok) events = events.filter((e) => e.id !== id);
+		try {
+			await apiFetch(`/api/events/${id}`, { method: 'DELETE' });
+			events = events.filter((e) => e.id !== id);
+		} catch (err) {
+			reportError(err);
+		}
 	}
 
 	// --- Chore handlers ---
@@ -207,33 +259,35 @@
 			const nextSortOrder = chores.length === 0
 				? 0
 				: Math.max(...chores.map((c) => c.sortOrder)) + 1;
-			const res = await fetch('/api/chores', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ ...payload, sortOrder: nextSortOrder })
-			});
-			if (res.ok) {
-				const chore: Chore = await res.json();
+			try {
+				const chore = await apiFetch<Chore>('/api/chores', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ ...payload, sortOrder: nextSortOrder })
+				});
 				chores = [...chores, chore];
+				showChoreModal = false;
+			} catch (err) {
+				reportError(err);
 			}
-			showChoreModal = false;
 		}
 	}
 
 	async function patchChore(id: string, patch: Record<string, unknown>): Promise<void> {
-		const res = await fetch(`/api/chores/${id}`, {
-			method: 'PATCH',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(patch)
-		});
-		if (res.ok) {
-			const updated: Chore = await res.json();
+		try {
+			const updated = await apiFetch<Chore>(`/api/chores/${id}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(patch)
+			});
 			chores = chores.map((c) => (c.id === id ? updated : c));
 			// If this was an approval, refresh member points
 			if ('approved' in patch && patch.approved) {
-				const mRes = await fetch('/api/members');
-				if (mRes.ok) members = await mRes.json();
+				members = await apiFetch<Member[]>('/api/members');
 			}
+		} catch (err) {
+			reportError(err);
+			throw err;
 		}
 	}
 
@@ -247,8 +301,12 @@
 	function rejectChore(id: string) { patchChore(id, { rejected: true }); }
 
 	async function deleteChore(id: string) {
-		const res = await fetch(`/api/chores/${id}`, { method: 'DELETE' });
-		if (res.ok) chores = chores.filter((c) => c.id !== id);
+		try {
+			await apiFetch(`/api/chores/${id}`, { method: 'DELETE' });
+			chores = chores.filter((c) => c.id !== id);
+		} catch (err) {
+			reportError(err);
+		}
 	}
 
 	function openEditChore(chore: Chore) {
@@ -257,6 +315,7 @@
 	}
 
 	async function reorderChore(id: string, direction: 'up' | 'down') {
+		const previous = chores;
 		// Sort only the active (non-completed, non-approved) chores
 		const sorted = chores
 			.filter((c) => !c.completed && !c.approved)
@@ -285,93 +344,133 @@
 			return c;
 		});
 
-		await Promise.all([
-			patchChore(a.id, { sortOrder: bOrder }),
-			patchChore(b.id, { sortOrder: aOrder })
-		]);
+		try {
+			await Promise.all([
+				patchChore(a.id, { sortOrder: bOrder }),
+				patchChore(b.id, { sortOrder: aOrder })
+			]);
+		} catch {
+			chores = previous;
+		}
 	}
 
 	// --- Grocery handlers ---
 
 	async function addGroceryItem(name: string) {
 		const nextOrder = grocery.length === 0 ? 0 : Math.max(...grocery.map((i) => i.sortOrder)) + 1;
-		const res = await fetch('/api/grocery', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ name, sortOrder: nextOrder })
-		});
-		if (res.ok) grocery = [...grocery, await res.json()];
+		try {
+			const item = await apiFetch<GroceryItem>('/api/grocery', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ name, sortOrder: nextOrder })
+			});
+			grocery = [...grocery, item];
+		} catch (err) {
+			reportError(err);
+		}
 	}
 
 	async function checkGroceryItem(id: string, checked: boolean) {
-		const res = await fetch(`/api/grocery/${id}`, {
+		const previous = grocery;
+		grocery = grocery.map((i) => (i.id === id ? { ...i, checked } : i));
+		const init = {
 			method: 'PATCH',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ checked })
-		});
-		if (res.ok) {
-			const updated: GroceryItem = await res.json();
+		};
+		if (browser && !navigator.onLine) {
+			queueOffline(`/api/grocery/${id}`, init);
+			return;
+		}
+		try {
+			const updated = await apiFetch<GroceryItem>(`/api/grocery/${id}`, init);
 			grocery = grocery.map((i) => (i.id === id ? updated : i));
+		} catch (err) {
+			if (browser && !navigator.onLine) {
+				queueOffline(`/api/grocery/${id}`, init);
+				return;
+			}
+			grocery = previous;
+			reportError(err);
 		}
 	}
 
 	async function deleteGroceryItem(id: string) {
-		const res = await fetch(`/api/grocery/${id}`, { method: 'DELETE' });
-		if (res.ok) grocery = grocery.filter((i) => i.id !== id);
+		try {
+			await apiFetch(`/api/grocery/${id}`, { method: 'DELETE' });
+			grocery = grocery.filter((i) => i.id !== id);
+		} catch (err) {
+			reportError(err);
+		}
 	}
 
 	async function clearCheckedGrocery() {
-		const res = await fetch('/api/grocery?checked=true', { method: 'DELETE' });
-		if (res.ok) grocery = grocery.filter((i) => !i.checked);
+		try {
+			await apiFetch('/api/grocery?checked=true', { method: 'DELETE' });
+			grocery = grocery.filter((i) => !i.checked);
+		} catch (err) {
+			reportError(err);
+		}
 	}
 
 	// --- Meal plan handlers ---
 
 	async function saveMeal(date: string, meal: string, notes: string | null) {
-		const res = await fetch(`/api/meals/${date}`, {
-			method: 'PUT',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ meal, notes })
-		});
-		if (res.ok) {
-			const updated: MealPlan = await res.json();
+		try {
+			const updated = await apiFetch<MealPlan>(`/api/meals/${date}`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ meal, notes })
+			});
 			meals = [...meals.filter((m) => m.date !== date), updated];
+		} catch (err) {
+			reportError(err);
 		}
 	}
 
 	async function deleteMeal(date: string) {
-		const res = await fetch(`/api/meals/${date}`, { method: 'DELETE' });
-		if (res.ok) meals = meals.filter((m) => m.date !== date);
+		try {
+			await apiFetch(`/api/meals/${date}`, { method: 'DELETE' });
+			meals = meals.filter((m) => m.date !== date);
+		} catch (err) {
+			reportError(err);
+		}
 	}
 
 	// --- Message board handlers ---
 
 	async function addMessage(text: string, authorId: string | null, authorName: string | null) {
-		const res = await fetch('/api/messages', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ text, authorId, authorName })
-		});
-		if (res.ok) {
-			const msg: Message = await res.json();
+		try {
+			const msg = await apiFetch<Message>('/api/messages', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ text, authorId, authorName })
+			});
 			messages = [msg, ...messages];
+		} catch (err) {
+			reportError(err);
 		}
 	}
 
 	async function deleteMessage(id: string) {
-		const res = await fetch(`/api/messages/${id}`, { method: 'DELETE' });
-		if (res.ok) messages = messages.filter((m) => m.id !== id);
+		try {
+			await apiFetch(`/api/messages/${id}`, { method: 'DELETE' });
+			messages = messages.filter((m) => m.id !== id);
+		} catch (err) {
+			reportError(err);
+		}
 	}
 
 	async function togglePinMessage(id: string, pinned: boolean) {
-		const res = await fetch(`/api/messages/${id}`, {
-			method: 'PATCH',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ pinned })
-		});
-		if (res.ok) {
-			const updated: Message = await res.json();
+		try {
+			const updated = await apiFetch<Message>(`/api/messages/${id}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ pinned })
+			});
 			messages = messages.map((m) => (m.id === id ? updated : m));
+		} catch (err) {
+			reportError(err);
 		}
 	}
 
@@ -379,23 +478,57 @@
 
 	async function toggleRoutine(routineId: string, memberId: string | null, done: boolean) {
 		if (done) {
-			const res = await fetch(`/api/routines/${routineId}/complete`, {
+			const optimistic: RoutineCompletion = {
+				id: `offline-${routineId}-${memberId ?? 'all'}-${todayStr}`,
+				routineId,
+				memberId,
+				date: todayStr,
+				completedAt: new Date()
+			};
+			const init = {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ date: todayStr, memberId })
-			});
-			if (res.ok) {
-				const row: RoutineCompletion = await res.json();
+			};
+			if (browser && !navigator.onLine) {
+				completions = [...completions.filter(c => !(c.routineId === routineId && c.memberId === memberId)), optimistic];
+				queueOffline(`/api/routines/${routineId}/complete`, init);
+				return;
+			}
+			try {
+				const row = await apiFetch<RoutineCompletion>(`/api/routines/${routineId}/complete`, init);
 				completions = [...completions.filter(c => !(c.routineId === routineId && c.memberId === memberId)), row];
+			} catch (err) {
+				if (browser && !navigator.onLine) {
+					completions = [...completions.filter(c => !(c.routineId === routineId && c.memberId === memberId)), optimistic];
+					queueOffline(`/api/routines/${routineId}/complete`, init);
+					return;
+				}
+				reportError(err);
 			}
 		} else {
-			const res = await fetch(`/api/routines/${routineId}/complete`, {
+			const previous = completions;
+			const init = {
 				method: 'DELETE',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ date: todayStr, memberId })
-			});
-			if (res.ok) {
+			};
+			if (browser && !navigator.onLine) {
 				completions = completions.filter(c => !(c.routineId === routineId && c.memberId === memberId));
+				queueOffline(`/api/routines/${routineId}/complete`, init);
+				return;
+			}
+			try {
+				await apiFetch(`/api/routines/${routineId}/complete`, init);
+				completions = completions.filter(c => !(c.routineId === routineId && c.memberId === memberId));
+			} catch (err) {
+				if (browser && !navigator.onLine) {
+					completions = completions.filter(c => !(c.routineId === routineId && c.memberId === memberId));
+					queueOffline(`/api/routines/${routineId}/complete`, init);
+					return;
+				}
+				completions = previous;
+				reportError(err);
 			}
 		}
 	}
@@ -405,23 +538,29 @@
 		const nextSortOrder = periodRoutines.length === 0
 			? 0
 			: Math.max(...periodRoutines.map(r => r.sortOrder)) + 1;
-		const res = await fetch('/api/routines', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ title, memberId, period, sortOrder: nextSortOrder })
-		});
-		if (res.ok) {
-			const routine: Routine = await res.json();
+		try {
+			const routine = await apiFetch<Routine>('/api/routines', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ title, memberId, period, sortOrder: nextSortOrder })
+			});
 			routines = [...routines, routine];
+		} catch (err) {
+			reportError(err);
 		}
 	}
 
 	async function deleteRoutine(id: string) {
-		const res = await fetch(`/api/routines/${id}`, { method: 'DELETE' });
-		if (res.ok) routines = routines.filter(r => r.id !== id);
+		try {
+			await apiFetch(`/api/routines/${id}`, { method: 'DELETE' });
+			routines = routines.filter(r => r.id !== id);
+		} catch (err) {
+			reportError(err);
+		}
 	}
 
 	async function reorderRoutine(id: string, direction: 'up' | 'down') {
+		const previous = routines;
 		const routine = routines.find(r => r.id === id);
 		if (!routine) return;
 		const periodList = routines
@@ -444,10 +583,15 @@
 			return r;
 		});
 
-		await Promise.all([
-			fetch(`/api/routines/${a.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sortOrder: bOrder }) }),
-			fetch(`/api/routines/${b.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sortOrder: aOrder }) })
-		]);
+		try {
+			await Promise.all([
+				apiFetch(`/api/routines/${a.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sortOrder: bOrder }) }),
+				apiFetch(`/api/routines/${b.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sortOrder: aOrder }) })
+			]);
+		} catch (err) {
+			routines = previous;
+			reportError(err);
+		}
 	}
 
 	// --- Member handlers ---
@@ -455,44 +599,73 @@
 	async function saveMember(payload: { name: string; color: string; emoji: string; birthday: string | null; role: string }) {
 		if (editingMember) {
 			// Edit
-			const res = await fetch(`/api/members/${editingMember.id}`, {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(payload)
-			});
-			if (res.ok) {
-				const updated: Member = await res.json();
+			try {
+				const updated = await apiFetch<Member>(`/api/members/${editingMember.id}`, {
+					method: 'PATCH',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify(payload)
+				});
 				members = members.map((m) => (m.id === updated.id ? updated : m));
+				editingMember = null;
+			} catch (err) {
+				reportError(err);
 			}
-			editingMember = null;
 		} else {
 			// Add
-			const res = await fetch('/api/members', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(payload)
-			});
-			if (res.ok) {
-				const added: Member = await res.json();
+			try {
+				const added = await apiFetch<Member>('/api/members', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify(payload)
+				});
 				members = [...members, added];
+				showAddMember = false;
+			} catch (err) {
+				reportError(err);
 			}
-			showAddMember = false;
 		}
 	}
 
 	async function deleteMember(id: string) {
-		const res = await fetch(`/api/members/${id}`, { method: 'DELETE' });
-		if (res.ok) {
+		try {
+			await apiFetch(`/api/members/${id}`, { method: 'DELETE' });
 			members = members.filter((m) => m.id !== id);
 			editingMember = null;
+		} catch (err) {
+			reportError(err);
 		}
 	}
 </script>
 
-<!-- Record any interaction to reset the sleep timer -->
-<svelte:document onmousemove={recordActivity} ontouchstart={recordActivity} onkeydown={recordActivity} />
+<!-- Record any interaction to reset the sleep timer; close admin menu on outside click -->
+<svelte:document
+	onmousemove={recordActivity}
+	ontouchstart={recordActivity}
+	onkeydown={recordActivity}
+	onclick={(e) => { if (adminMenuEl && !adminMenuEl.contains(e.target as Node)) showAdminMenu = false; }}
+/>
 
-<div class="min-h-screen bg-slate-900 text-white flex flex-col">
+<MeshBackground {members} />
+
+{#if actionError}
+	<div class="fixed top-4 left-1/2 -translate-x-1/2 z-[80] max-w-md rounded-xl border border-red-500/40 bg-red-950/95 px-4 py-3 text-sm font-medium text-red-100 shadow-2xl">
+		{actionError}
+	</div>
+{/if}
+
+{#if !isOnline || offlineQueued > 0}
+	<div class="fixed top-4 right-4 z-[80] rounded-xl border border-amber-500/40 bg-slate-950/95 px-4 py-3 text-sm text-slate-200 shadow-2xl">
+		<div class="flex items-center gap-2">
+			<span class="h-2 w-2 rounded-full {isOnline ? 'bg-amber-400' : 'bg-red-400'}"></span>
+			<span>{isOnline ? 'Sync pending' : 'Offline'}</span>
+			{#if offlineQueued > 0}
+				<span class="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs text-amber-300">{offlineQueued}</span>
+			{/if}
+		</div>
+	</div>
+{/if}
+
+<div class="relative min-h-screen text-white flex flex-col">
 	<!-- Top bar -->
 	<header class="flex items-center justify-between px-8 pt-6 pb-4 border-b border-slate-800">
 		<Clock />
@@ -544,7 +717,8 @@
 	<!-- Main content: calendar + right panel -->
 	<main class="flex flex-1 gap-0 overflow-hidden">
 		<!-- Calendar: 60% -->
-		<section class="flex-[3] p-6 overflow-y-auto">
+		<section class="flex-[3] p-6 overflow-y-auto flex flex-col gap-4">
+			<AgendaStrip {events} {chores} {meals} {members} {todayStr} />
 			<Calendar
 				{events}
 				{members}
@@ -648,27 +822,33 @@
 <!-- Admin bar (floating bottom-right) -->
 <AdminBar {adminMode} onUnlock={unlock} onLock={lock} />
 
-<!-- People button (floating bottom-right, above admin bar, only in admin mode) -->
+<!-- Admin menu button (above Parent Mode button, only in admin mode) -->
 {#if adminMode}
-	<div class="fixed bottom-20 right-6 z-30 flex flex-col gap-2 items-end">
+	<div class="fixed bottom-20 right-6 z-30" bind:this={adminMenuEl}>
+
+		<!-- Popover menu -->
+		{#if showAdminMenu}
+			<div class="absolute bottom-full mb-2 right-0 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden min-w-44">
+				<button
+					onclick={() => { showAdminMenu = false; showThemeSettings = true; }}
+					class="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-sm text-slate-200 text-left"
+				>{activeTheme === 'light' ? '☀️' : '🌙'} Theme</button>
+				<button
+					onclick={() => { showAdminMenu = false; showFeedManager = true; }}
+					class="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-sm text-slate-200 text-left border-t border-slate-700"
+				>📅 Calendars</button>
+				<button
+					onclick={() => { showAdminMenu = false; showPeoplePanel = true; }}
+					class="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-sm text-slate-200 text-left border-t border-slate-700"
+				>👥 People</button>
+			</div>
+		{/if}
+
+		<!-- Trigger -->
 		<button
-			onclick={() => (showThemeSettings = true)}
-			class="flex items-center gap-2 px-4 py-2.5 rounded-full bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm shadow-lg transition-colors"
-		>
-			{activeTheme === 'light' ? '☀️' : '🌙'} Theme
-		</button>
-		<button
-			onclick={() => (showFeedManager = true)}
-			class="flex items-center gap-2 px-4 py-2.5 rounded-full bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm shadow-lg transition-colors"
-		>
-			📅 Calendars
-		</button>
-		<button
-			onclick={() => (showPeoplePanel = true)}
-			class="flex items-center gap-2 px-4 py-2.5 rounded-full bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm shadow-lg transition-colors"
-		>
-			👥 People
-		</button>
+			onclick={() => (showAdminMenu = !showAdminMenu)}
+			class="flex items-center gap-2 px-4 py-2.5 rounded-full text-slate-200 text-sm shadow-lg transition-colors {showAdminMenu ? 'bg-slate-600' : 'bg-slate-700 hover:bg-slate-600'}"
+		>⚙️ Settings</button>
 	</div>
 {/if}
 

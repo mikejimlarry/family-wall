@@ -3,6 +3,8 @@ import type { RequestHandler } from './$types';
 import { getDatabase } from '$lib/server/db';
 import { chores, familyMembers } from '$lib/server/db/schema';
 import { eq, inArray, sql } from 'drizzle-orm';
+import { requireAdmin } from '$lib/server/auth';
+import { optionalBoolean, optionalDateString, optionalEnum, optionalInteger, optionalStringArray, optionalTrimmedString, parseValidated, readJsonObject } from '$lib/server/validation';
 
 function parseAssignees(raw: string | null): string[] {
 	if (!raw) return [];
@@ -22,19 +24,34 @@ function nextDueDate(current: string | null, recurrence: string): string {
 	return base.toISOString().split('T')[0];
 }
 
-export const PATCH: RequestHandler = async ({ params, request, platform }) => {
+function localDateStr(d = new Date()): string {
+	const y = d.getFullYear();
+	const m = String(d.getMonth() + 1).padStart(2, '0');
+	const day = String(d.getDate()).padStart(2, '0');
+	return `${y}-${m}-${day}`;
+}
+
+export const PATCH: RequestHandler = async ({ params, request, platform, cookies }) => {
 	const db = await getDatabase(platform);
-	const body = await request.json() as {
-		completed?: boolean;
-		approved?: boolean;
-		rejected?: boolean;
-		title?: string;
-		assignedTo?: string[];
-		dueDate?: string | null;
-		recurrence?: string | null;
-		points?: number;
-		sortOrder?: number;
-	};
+	await requireAdmin(db, cookies, platform);
+	const raw = await readJsonObject(request);
+	if (!raw.ok) return raw.response;
+	const parsed = parseValidated(raw.value, (body) => ({
+		completed: optionalBoolean(body, 'completed'),
+		approved: optionalBoolean(body, 'approved'),
+		rejected: optionalBoolean(body, 'rejected'),
+		title: optionalTrimmedString(body, 'title'),
+		assignedTo: optionalStringArray(body, 'assignedTo'),
+		dueDate: optionalDateString(body, 'dueDate'),
+		recurrence: body.recurrence === null || body.recurrence === ''
+			? null
+			: optionalEnum(body, 'recurrence', ['daily', 'weekly', 'monthly'] as const),
+		points: optionalInteger(body, 'points', 0, 100),
+		sortOrder: optionalInteger(body, 'sortOrder', 0, 10000)
+	}));
+	if (!parsed.ok) return parsed.response;
+	const body = parsed.value;
+	const has = (key: string) => Object.prototype.hasOwnProperty.call(raw.value, key);
 
 	const [existing] = await db.select().from(chores).where(eq(chores.id, params.id));
 	if (!existing) throw error(404, 'Chore not found');
@@ -49,16 +66,18 @@ export const PATCH: RequestHandler = async ({ params, request, platform }) => {
 		updates.approved   = false;
 		updates.approvedAt  = null;
 	} else {
-		if ('completed' in body) {
+		if (has('completed')) {
 			updates.completed  = body.completed;
 			updates.completedAt = body.completed ? new Date() : null;
 		}
-		if ('approved' in body && body.approved) {
+		if (has('approved') && body.approved) {
 			const assignees = parseAssignees(existing.assignedTo);
 			if (assignees.length > 0) {
 				awardMemberIds = assignees;
 				pointsToAward  = existing.points ?? 1;
 			}
+			updates.streakCount = (existing.streakCount ?? 0) + 1;
+			updates.lastApprovedDate = localDateStr();
 
 			if (existing.recurrence) {
 				updates.completed  = false;
@@ -70,18 +89,18 @@ export const PATCH: RequestHandler = async ({ params, request, platform }) => {
 				updates.approved   = true;
 				updates.approvedAt  = new Date();
 			}
-		} else if ('approved' in body) {
+		} else if (has('approved')) {
 			updates.approved   = body.approved;
 			updates.approvedAt  = body.approved ? new Date() : null;
 		}
 	}
 
-	if ('title' in body)      updates.title      = body.title;
-	if ('assignedTo' in body) updates.assignedTo = body.assignedTo?.length ? JSON.stringify(body.assignedTo) : null;
-	if ('dueDate' in body)    updates.dueDate    = body.dueDate;
-	if ('recurrence' in body) updates.recurrence = body.recurrence;
-	if ('points' in body)     updates.points     = body.points;
-	if ('sortOrder' in body)  updates.sortOrder  = body.sortOrder;
+	if (body.title !== undefined) updates.title = body.title;
+	if (has('assignedTo')) updates.assignedTo = body.assignedTo?.length ? JSON.stringify(body.assignedTo) : null;
+	if (has('dueDate'))    updates.dueDate    = body.dueDate;
+	if (has('recurrence')) updates.recurrence = body.recurrence ?? null;
+	if (has('points'))     updates.points     = body.points;
+	if (has('sortOrder'))  updates.sortOrder  = body.sortOrder;
 
 	const [updated] = await db
 		.update(chores)
@@ -102,8 +121,9 @@ export const PATCH: RequestHandler = async ({ params, request, platform }) => {
 	return json({ ...updated, assignedTo: parseAssignees(updated.assignedTo) });
 };
 
-export const DELETE: RequestHandler = async ({ params, platform }) => {
+export const DELETE: RequestHandler = async ({ params, platform, cookies }) => {
 	const db = await getDatabase(platform);
+	await requireAdmin(db, cookies, platform);
 	const deleted = await db.delete(chores).where(eq(chores.id, params.id)).returning();
 	if (!deleted.length) throw error(404, 'Chore not found');
 	return json({ ok: true });

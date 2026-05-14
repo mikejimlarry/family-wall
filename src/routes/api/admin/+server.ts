@@ -1,24 +1,26 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getDatabase } from '$lib/server/db';
-import { appSettings } from '$lib/server/db/schema';
-import { eq } from 'drizzle-orm';
+import { clearAdminSession, getAdminPin, setAdminSession } from '$lib/server/auth';
+import { readJsonObject } from '$lib/server/validation';
 
 /** POST /api/admin — verify PIN, returns { ok: true } or 401 */
-export const POST: RequestHandler = async ({ request, platform }) => {
+export const POST: RequestHandler = async ({ request, platform, cookies }) => {
 	const db = await getDatabase(platform);
-	const body = await request.json() as { pin?: string };
+	const parsed = await readJsonObject(request);
+	if (!parsed.ok) return parsed.response;
 
-	const row = await db
-		.select()
-		.from(appSettings)
-		.where(eq(appSettings.key, 'admin.pin'))
-		.then((r) => r[0]);
+	const pin = parsed.value.pin;
+	const storedPin = await getAdminPin(db);
 
-	const storedPin = row?.value ?? '1234';
-
-	if (body.pin === storedPin) {
+	if (storedPin && typeof pin === 'string' && pin === storedPin) {
+		await setAdminSession(db, cookies, platform);
 		return json({ ok: true });
 	}
 	return json({ error: 'Wrong PIN' }, { status: 401 });
+};
+
+export const DELETE: RequestHandler = async ({ cookies }) => {
+	clearAdminSession(cookies);
+	return json({ ok: true });
 };

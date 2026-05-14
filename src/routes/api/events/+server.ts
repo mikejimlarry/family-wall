@@ -3,6 +3,8 @@ import type { RequestHandler } from './$types';
 import { getDatabase } from '$lib/server/db';
 import { events } from '$lib/server/db/schema';
 import { and, gte, lte } from 'drizzle-orm';
+import { requireAdmin } from '$lib/server/auth';
+import { optionalBoolean, optionalDateString, optionalNullableString, parseValidated, readJsonObject, requiredDateString, requiredTrimmedString } from '$lib/server/validation';
 
 export const GET: RequestHandler = async ({ url, platform }) => {
 	const db = await getDatabase(platform);
@@ -21,25 +23,30 @@ export const GET: RequestHandler = async ({ url, platform }) => {
 	return json(rows);
 };
 
-export const POST: RequestHandler = async ({ request, platform }) => {
+export const POST: RequestHandler = async ({ request, platform, cookies }) => {
 	const db = await getDatabase(platform);
-	const body = await request.json() as {
-		title?: string;
-		startDate?: string;
-		endDate?: string;
-		allDay?: boolean;
-		memberId?: string;
-		recurrenceRule?: string | null;
-	};
+	await requireAdmin(db, cookies, platform);
+	const raw = await readJsonObject(request);
+	if (!raw.ok) return raw.response;
+	const parsed = parseValidated(raw.value, (body) => ({
+		title: requiredTrimmedString(body, 'title'),
+		startDate: requiredDateString(body, 'startDate'),
+		endDate: optionalDateString(body, 'endDate') ?? null,
+		allDay: optionalBoolean(body, 'allDay') ?? true,
+		memberId: optionalNullableString(body, 'memberId') ?? null,
+		recurrenceRule: optionalNullableString(body, 'recurrenceRule', 500) ?? null
+	}));
+	if (!parsed.ok) return parsed.response;
+	const body = parsed.value;
 
-	if (!body.title?.trim() || !body.startDate) {
-		return json({ error: 'Title and startDate are required' }, { status: 400 });
+	if (body.endDate && body.endDate < body.startDate) {
+		return json({ error: 'endDate cannot be before startDate' }, { status: 400 });
 	}
 
 	const [event] = await db
 		.insert(events)
 		.values({
-			title: body.title.trim(),
+			title: body.title,
 			startDate: body.startDate,
 			endDate: body.endDate ?? null,
 			allDay: body.allDay ?? true,

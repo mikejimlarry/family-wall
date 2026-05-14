@@ -43,6 +43,8 @@ export const chores = sqliteTable('chores', {
 	dueDate: text('due_date'),
 	recurrence: text('recurrence'),
 	points: integer('points').notNull().default(1),
+	streakCount: integer('streak_count').notNull().default(0),
+	lastApprovedDate: text('last_approved_date'),
 	sortOrder: integer('sort_order').notNull().default(0),
 	createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date())
 });
@@ -52,6 +54,7 @@ export const groceryItems = sqliteTable('grocery_items', {
 	name: text('name').notNull(),
 	checked: integer('checked', { mode: 'boolean' }).notNull().default(false),
 	checkedAt: integer('checked_at', { mode: 'timestamp' }),
+	category: text('category').notNull().default('Other'),
 	sortOrder: integer('sort_order').notNull().default(0),
 	createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date())
 });

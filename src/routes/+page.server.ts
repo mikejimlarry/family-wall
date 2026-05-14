@@ -2,11 +2,9 @@ import type { PageServerLoad } from './$types';
 import { getDatabase } from '$lib/server/db';
 import { familyMembers, chores, events, appSettings, groceryItems, mealPlan, messages, calendarFeeds, routines, routineCompletions } from '$lib/server/db/schema';
 import { and, gte, lte, desc, eq, asc } from 'drizzle-orm';
-import { syncFeed } from '$lib/server/ical-sync';
 import type { WeatherData } from '$lib/weather';
 
 const CACHE_TTL_MS     = 10 * 60 * 1000;
-const FEED_SYNC_TTL_MS = 30 * 60 * 1000; // re-sync feeds every 30 min
 
 export const load: PageServerLoad = async ({ platform }) => {
 	const db = await getDatabase(platform);
@@ -47,14 +45,6 @@ export const load: PageServerLoad = async ({ platform }) => {
 		db.select().from(routines).orderBy(asc(routines.sortOrder), asc(routines.createdAt)),
 		db.select().from(routineCompletions).where(eq(routineCompletions.date, todayStr))
 	]);
-
-	// Auto-sync stale calendar feeds (don't await — fire-and-forget so page load stays fast)
-	const staleFeeds = feeds.filter(f =>
-		!f.lastSyncedAt || (Date.now() - new Date(f.lastSyncedAt).getTime() > FEED_SYNC_TTL_MS)
-	);
-	if (staleFeeds.length > 0) {
-		Promise.all(staleFeeds.map(f => syncFeed(db, f).catch(() => null)));
-	}
 
 	const s = Object.fromEntries(settingsRows.map((r) => [r.key, r.value]));
 

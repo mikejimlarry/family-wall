@@ -3,11 +3,21 @@ import type { RequestHandler } from './$types';
 import { getDatabase } from '$lib/server/db';
 import { routineCompletions } from '$lib/server/db/schema';
 import { and, eq, isNull } from 'drizzle-orm';
+import { requireAdmin } from '$lib/server/auth';
+import { optionalNullableString, parseValidated, readJsonObject, requiredDateString } from '$lib/server/validation';
 
 /** POST — mark a routine done for a given date + member */
-export const POST: RequestHandler = async ({ params, request, platform }) => {
+export const POST: RequestHandler = async ({ params, request, platform, cookies }) => {
 	const db = await getDatabase(platform);
-	const body = await request.json() as { date: string; memberId: string | null };
+	await requireAdmin(db, cookies, platform);
+	const raw = await readJsonObject(request);
+	if (!raw.ok) return raw.response;
+	const parsed = parseValidated(raw.value, (body) => ({
+		date: requiredDateString(body, 'date'),
+		memberId: optionalNullableString(body, 'memberId') ?? null
+	}));
+	if (!parsed.ok) return parsed.response;
+	const body = parsed.value;
 
 	const [row] = await db
 		.insert(routineCompletions)
@@ -19,9 +29,17 @@ export const POST: RequestHandler = async ({ params, request, platform }) => {
 };
 
 /** DELETE — unmark a routine for a given date + member */
-export const DELETE: RequestHandler = async ({ params, request, platform }) => {
+export const DELETE: RequestHandler = async ({ params, request, platform, cookies }) => {
 	const db = await getDatabase(platform);
-	const body = await request.json() as { date: string; memberId: string | null };
+	await requireAdmin(db, cookies, platform);
+	const raw = await readJsonObject(request);
+	if (!raw.ok) return raw.response;
+	const parsed = parseValidated(raw.value, (body) => ({
+		date: requiredDateString(body, 'date'),
+		memberId: optionalNullableString(body, 'memberId') ?? null
+	}));
+	if (!parsed.ok) return parsed.response;
+	const body = parsed.value;
 
 	const memberClause = body.memberId
 		? eq(routineCompletions.memberId, body.memberId)

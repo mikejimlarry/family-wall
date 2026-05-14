@@ -286,14 +286,14 @@
 		</div>
 
 		<!-- Calendar grid -->
-		<div class="grid grid-cols-7 gap-px bg-slate-700/30 rounded-xl overflow-hidden flex-1">
+		<div class="grid grid-cols-7 gap-0 rounded-xl overflow-hidden flex-1 border-l border-t border-slate-700">
 			{#each calendarDays as cell (cell.dateStr)}
 				{@const dayEvts = eventsForDate(cell.dateStr)}
 				{@const isToday    = cell.dateStr === todayStr}
 				{@const isSelected = cell.dateStr === selectedDate}
 				<button
 					onclick={() => selectDate(cell.dateStr)}
-					class="bg-slate-900 p-1 flex flex-col gap-0.5 min-h-[4.5rem] text-left transition-colors hover:bg-slate-800 {isSelected ? 'ring-1 ring-inset ring-blue-500' : ''}"
+					class="calendar-day-cell bg-slate-900 p-1 flex flex-col gap-0.5 min-h-[4.5rem] text-left transition-colors hover:bg-slate-800 border-r border-b border-slate-700 {isSelected ? 'ring-1 ring-inset ring-blue-500' : ''}"
 				>
 					<span class="text-xs w-5 h-5 flex items-center justify-center rounded-full leading-none shrink-0 {isToday
 						? 'bg-blue-500 text-white font-semibold'
@@ -303,7 +303,7 @@
 					<div class="flex flex-col gap-0.5 w-full overflow-hidden">
 						{#each dayEvts.slice(0, 2) as event (event.id)}
 							<span
-								class="block text-[10px] px-1 py-px rounded truncate leading-tight"
+								class="block text-xs px-1.5 py-0.5 rounded truncate leading-tight font-medium"
 								style="background-color: {eventColor(event)}28; color: {eventColor(event)}"
 							>{event.title}</span>
 						{/each}
@@ -363,11 +363,11 @@
 	<!-- ══════════════════════════════════════════════════════════ -->
 	{:else if currentView === 'week'}
 
-		<div class="grid grid-cols-7 gap-px bg-slate-700/30 rounded-xl overflow-hidden flex-1 min-h-0">
+		<div class="grid grid-cols-7 gap-0 rounded-xl overflow-hidden flex-1 min-h-0 border-l border-t border-slate-700">
 			{#each weekDays as { date, dateStr } (dateStr)}
 				{@const isToday = dateStr === todayStr}
 				{@const dayEvts = eventsForDate(dateStr)}
-				<div class="bg-slate-900 flex flex-col min-h-0">
+				<div class="bg-slate-900 flex flex-col min-h-0 border-r border-b border-slate-700">
 					<!-- Day column header — click to go to day view -->
 					<button
 						onclick={() => { viewDate = date; currentView = 'day'; }}
@@ -388,7 +388,7 @@
 						{#each dayEvts as event (event.id)}
 							<div class="group relative">
 								<span
-									class="block text-[10px] px-1.5 py-1 rounded leading-tight break-words"
+									class="block text-xs px-2 py-1.5 rounded leading-tight break-words font-medium"
 									style="background-color: {eventColor(event)}28; color: {eventColor(event)}"
 								>{event.title}</span>
 								{#if adminMode && event.source !== 'birthday'}

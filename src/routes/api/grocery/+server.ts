@@ -3,6 +3,9 @@ import type { RequestHandler } from './$types';
 import { getDatabase } from '$lib/server/db';
 import { groceryItems } from '$lib/server/db/schema';
 import { eq, asc } from 'drizzle-orm';
+import { requireAdmin } from '$lib/server/auth';
+import { optionalEnum, optionalInteger, parseValidated, readJsonObject, requiredTrimmedString } from '$lib/server/validation';
+import { GROCERY_CATEGORIES, inferGroceryCategory } from '$lib/utils/grocery';
 
 export const GET: RequestHandler = async ({ platform }) => {
 	const db = await getDatabase(platform);
@@ -13,25 +16,35 @@ export const GET: RequestHandler = async ({ platform }) => {
 	return json(rows);
 };
 
-export const POST: RequestHandler = async ({ request, platform }) => {
+export const POST: RequestHandler = async ({ request, platform, cookies }) => {
 	const db = await getDatabase(platform);
-	const body = await request.json() as { name?: string; sortOrder?: number };
-
-	if (!body.name?.trim()) {
-		return json({ error: 'Name is required' }, { status: 400 });
-	}
+	await requireAdmin(db, cookies, platform);
+	const raw = await readJsonObject(request);
+	if (!raw.ok) return raw.response;
+	const parsed = parseValidated(raw.value, (body) => ({
+		name: requiredTrimmedString(body, 'name'),
+		category: optionalEnum(body, 'category', GROCERY_CATEGORIES) ?? null,
+		sortOrder: optionalInteger(body, 'sortOrder', 0, 10000) ?? 0
+	}));
+	if (!parsed.ok) return parsed.response;
+	const body = parsed.value;
 
 	const [item] = await db
 		.insert(groceryItems)
-		.values({ name: body.name.trim(), sortOrder: body.sortOrder ?? 0 })
+		.values({
+			name: body.name,
+			category: body.category ?? inferGroceryCategory(body.name),
+			sortOrder: body.sortOrder
+		})
 		.returning();
 
 	return json(item, { status: 201 });
 };
 
 // DELETE with ?checked=true clears all checked items
-export const DELETE: RequestHandler = async ({ url, platform }) => {
+export const DELETE: RequestHandler = async ({ url, platform, cookies }) => {
 	const db = await getDatabase(platform);
+	await requireAdmin(db, cookies, platform);
 	if (url.searchParams.get('checked') === 'true') {
 		await db.delete(groceryItems).where(eq(groceryItems.checked, true));
 		return json({ ok: true });

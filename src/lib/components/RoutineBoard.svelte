@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import type { Routine, RoutineCompletion, RoutinePeriod, Member } from '$lib/types';
 
 	type Props = {
@@ -54,11 +54,14 @@
 	let addingPeriod = $state<RoutinePeriod | null>(null);
 	let addText = $state('');
 	let addMemberId = $state('');
+	let addInputEl = $state<HTMLInputElement | null>(null);
 
-	function startAdd(period: RoutinePeriod) {
+	async function startAdd(period: RoutinePeriod) {
 		addingPeriod = period;
 		addText = '';
 		addMemberId = activeMemberId ?? '';
+		await tick();
+		addInputEl?.focus();
 	}
 
 	function submitAdd() {
@@ -224,15 +227,14 @@
 				<!-- Inline add form -->
 				{#if addingPeriod === period.key}
 					<div class="flex gap-2 px-2 py-2 bg-slate-800 rounded-xl mt-1">
-						<!-- svelte:ignore a11y_autofocus -->
-						<input
-							type="text"
-							placeholder="Add a step…"
-							bind:value={addText}
-							onkeydown={handleAddKey}
-							autofocus
-							class="flex-1 bg-slate-700 text-white placeholder-slate-500 rounded-lg px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-blue-500"
-						/>
+							<input
+								bind:this={addInputEl}
+								type="text"
+								placeholder="Add a step…"
+								bind:value={addText}
+								onkeydown={handleAddKey}
+								class="flex-1 bg-slate-700 text-white placeholder-slate-500 rounded-lg px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-blue-500"
+							/>
 						{#if members.length > 0}
 							<select
 								bind:value={addMemberId}

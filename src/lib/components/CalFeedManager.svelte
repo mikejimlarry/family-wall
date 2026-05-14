@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { CalendarFeed, CalendarEvent } from '$lib/types';
+	import { apiFetch } from '$lib/api';
 
 	type Props = {
 		feeds: CalendarFeed[];
@@ -38,13 +39,11 @@
 		adding  = true;
 		addError = '';
 		try {
-			const res = await fetch('/api/cal/feeds', {
+			const json = await apiFetch<{ feed: CalendarFeed; syncError?: string }>('/api/cal/feeds', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ url, name: nameInput.trim() || undefined, color: colorPick })
 			});
-			const json = await res.json() as { feed: CalendarFeed; syncError?: string };
-			if (!res.ok) { addError = (json as { error?: string }).error ?? 'Failed to add'; return; }
 
 			onFeedsChange([...feeds, json.feed]);
 			urlInput  = '';
@@ -68,21 +67,16 @@
 		syncingId = feedId;
 		syncErrors = { ...syncErrors, [feedId]: '' };
 		try {
-			const res = await fetch('/api/cal/sync', {
+			await apiFetch<{ ok?: boolean; count?: number }>('/api/cal/sync', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ feedId })
 			});
-			const json = await res.json() as { ok?: boolean; error?: string };
-			if (!res.ok || json.error) {
-				syncErrors = { ...syncErrors, [feedId]: json.error ?? 'Sync failed' };
-			} else {
-				// Update lastSyncedAt in local list
-				onFeedsChange(feeds.map(f => f.id === feedId ? { ...f, lastSyncedAt: new Date() } : f));
-				await refreshEvents(feedId);
-			}
+			// Update lastSyncedAt in local list
+			onFeedsChange(feeds.map(f => f.id === feedId ? { ...f, lastSyncedAt: new Date() } : f));
+			await refreshEvents(feedId);
 		} catch (e) {
-			syncErrors = { ...syncErrors, [feedId]: String(e) };
+			syncErrors = { ...syncErrors, [feedId]: e instanceof Error ? e.message : String(e) };
 		} finally {
 			syncingId = null;
 		}
@@ -91,30 +85,31 @@
 	async function refreshEvents(feedId: string) {
 		// Fetch the newly synced events for this feed from the server
 		// We do a lightweight fetch of just the events endpoint filtered by source
-		const res = await fetch(`/api/cal/events?feedId=${feedId}`);
-		if (res.ok) {
-			const evts: CalendarEvent[] = await res.json();
-			onEventsRefresh(feedId, evts);
-		}
+		const evts = await apiFetch<CalendarEvent[]>(`/api/cal/events?feedId=${feedId}`);
+		onEventsRefresh(feedId, evts);
 	}
 
 	async function updateColor(feedId: string, color: string) {
 		colorPickerId = null;
-		const res = await fetch(`/api/cal/feeds/${feedId}`, {
-			method: 'PATCH',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ color })
-		});
-		if (res.ok) {
+		try {
+			await apiFetch(`/api/cal/feeds/${feedId}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ color })
+			});
 			onFeedsChange(feeds.map(f => f.id === feedId ? { ...f, color } : f));
+		} catch (e) {
+			syncErrors = { ...syncErrors, [feedId]: e instanceof Error ? e.message : String(e) };
 		}
 	}
 
 	async function deleteFeed(feedId: string) {
-		const res = await fetch(`/api/cal/feeds/${feedId}`, { method: 'DELETE' });
-		if (res.ok) {
+		try {
+			await apiFetch(`/api/cal/feeds/${feedId}`, { method: 'DELETE' });
 			onFeedsChange(feeds.filter(f => f.id !== feedId));
 			onEventsRefresh(feedId, []); // remove events from local state
+		} catch (e) {
+			syncErrors = { ...syncErrors, [feedId]: e instanceof Error ? e.message : String(e) };
 		}
 	}
 

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { GroceryItem } from '$lib/types';
+	import { GROCERY_CATEGORIES } from '$lib/utils/grocery';
 
 	type Props = {
 		items: GroceryItem[];
@@ -21,6 +22,15 @@
 		const bT = b.checkedAt ? new Date(b.checkedAt).getTime() : 0;
 		return bT - aT;
 	}));
+
+	const groupedUnchecked = $derived(
+		GROCERY_CATEGORIES
+			.map((category) => ({
+				category,
+				items: unchecked.filter((item) => (item.category || 'Other') === category)
+			}))
+			.filter((group) => group.items.length > 0)
+	);
 
 	function submitAdd() {
 		const name = newItem.trim();
@@ -86,21 +96,31 @@
 		{/if}
 
 		<!-- Unchecked -->
-		{#each unchecked as item (item.id)}
-			<div class="group flex items-center gap-3 px-2 py-3 rounded-xl border border-slate-800 hover:bg-slate-800/60 transition-colors">
-				<button
-					onclick={() => onCheck(item.id, true)}
-					class="w-8 h-8 rounded-lg border-2 border-slate-500 hover:border-green-400 transition-colors shrink-0 flex items-center justify-center"
-					aria-label="Mark as got"
-				></button>
-				<span class="flex-1 text-base text-slate-200">{item.name}</span>
-				{#if adminMode}
-					<button
-						onclick={() => onDelete(item.id)}
-						class="opacity-0 group-hover:opacity-100 w-9 h-9 flex items-center justify-center rounded-lg text-slate-600 hover:text-red-400 hover:bg-slate-700 transition-all text-sm"
-						aria-label="Delete item"
-					>✕</button>
-				{/if}
+		{#each groupedUnchecked as group (group.category)}
+			<div class="mt-1 first:mt-0">
+				<div class="mb-1 flex items-center justify-between px-2">
+					<span class="text-xs font-semibold uppercase tracking-wide text-slate-500">{group.category}</span>
+					<span class="text-[11px] text-slate-700">{group.items.length}</span>
+				</div>
+				<div class="flex flex-col gap-1">
+					{#each group.items as item (item.id)}
+						<div class="group flex items-center gap-3 px-2 py-3 rounded-xl border border-slate-800 hover:bg-slate-800/60 transition-colors">
+							<button
+								onclick={() => onCheck(item.id, true)}
+								class="w-8 h-8 rounded-lg border-2 border-slate-500 hover:border-green-400 transition-colors shrink-0 flex items-center justify-center"
+								aria-label="Mark as got"
+							></button>
+							<span class="flex-1 text-base text-slate-200">{item.name}</span>
+							{#if adminMode}
+								<button
+									onclick={() => onDelete(item.id)}
+									class="opacity-0 group-hover:opacity-100 w-9 h-9 flex items-center justify-center rounded-lg text-slate-600 hover:text-red-400 hover:bg-slate-700 transition-all text-sm"
+									aria-label="Delete item"
+								>✕</button>
+							{/if}
+						</div>
+					{/each}
+				</div>
 			</div>
 		{/each}
 

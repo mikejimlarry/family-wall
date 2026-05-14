@@ -72,6 +72,15 @@
 	const activeCount = $derived(overdue.length + upcoming.length);
 	let showHistory = $state(false);
 
+	const rewardTiers = [
+		{ points: 10, label: 'Pick dessert' },
+		{ points: 25, label: 'Movie night' },
+		{ points: 50, label: 'Special outing' },
+		{ points: 100, label: 'Big reward' }
+	];
+
+	const longestStreak = $derived(Math.max(0, ...chores.map((c) => c.streakCount ?? 0)));
+
 	// Primary color for a chore's circle — first assignee's color, or grey
 	function choreColor(c: Chore): string {
 		if (c.assignedTo.length === 0) return '#64748b';
@@ -142,6 +151,11 @@
 			{#if pendingApproval.length > 0 && adminMode}
 				<span class="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 font-medium">
 					{pendingApproval.length} to review
+				</span>
+			{/if}
+			{#if longestStreak >= 3}
+				<span class="text-xs px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-300 font-medium">
+					🔥 {longestStreak} streak
 				</span>
 			{/if}
 		</div>
@@ -217,6 +231,9 @@
 									{#if recur}
 										<span class="text-xs px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-400 shrink-0">↻ {recur}</span>
 									{/if}
+									{#if chore.streakCount >= 2}
+										<span class="text-xs px-1.5 py-0.5 rounded-full bg-orange-500/20 text-orange-300 shrink-0">🔥 {chore.streakCount}</span>
+									{/if}
 								</div>
 								<div class="flex items-center gap-1.5 mt-0.5">
 									<p class="text-xs text-red-400/80">
@@ -261,6 +278,9 @@
 								<span class="text-xs px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-400">
 									↻ {recurrenceLabel(chore.recurrence)}
 								</span>
+							{/if}
+							{#if chore.streakCount >= 2}
+								<span class="text-xs px-1.5 py-0.5 rounded-full bg-orange-500/20 text-orange-300">🔥 {chore.streakCount}</span>
 							{/if}
 						</div>
 						<div class="flex items-center gap-1.5 mt-0.5">
@@ -342,6 +362,11 @@
 								↻ {recur}
 							</span>
 						{/if}
+						{#if chore.streakCount >= 2}
+							<span class="text-xs px-1.5 py-0.5 rounded-full bg-orange-500/20 text-orange-300 shrink-0">
+								🔥 {chore.streakCount}
+							</span>
+						{/if}
 					</div>
 					<!-- Assignee avatars -->
 					{#if chore.assignedTo.length > 0}
@@ -387,8 +412,15 @@
 			{@const ranked = members.filter(m => m.pointsEarned > 0).sort((a, b) => b.pointsEarned - a.pointsEarned)}
 			{@const topScore = ranked[0]?.pointsEarned ?? 1}
 			<div class="mt-3 rounded-xl bg-slate-800/60 p-3 flex flex-col gap-2">
-				<p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">⭐ Points</p>
+				<div class="flex items-center justify-between">
+					<p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">⭐ Points & rewards</p>
+					<span class="text-[11px] text-slate-600">Next milestones</span>
+				</div>
 				{#each ranked as m (m.id)}
+					{@const nextReward = rewardTiers.find((tier) => tier.points > m.pointsEarned)}
+					{@const prevPoints = rewardTiers.filter((tier) => tier.points <= m.pointsEarned).at(-1)?.points ?? 0}
+					{@const targetPoints = nextReward?.points ?? m.pointsEarned}
+					{@const rewardProgress = nextReward ? Math.min(100, Math.round(((m.pointsEarned - prevPoints) / (targetPoints - prevPoints)) * 100)) : 100}
 					<div class="flex items-center gap-2">
 						<span class="text-base shrink-0">{m.emoji ?? '👤'}</span>
 						<span class="text-sm text-slate-300 w-20 truncate shrink-0">{m.name}</span>
@@ -399,6 +431,14 @@
 							></div>
 						</div>
 						<span class="text-sm font-bold tabular-nums shrink-0" style="color: {m.color}">{m.pointsEarned}</span>
+					</div>
+					<div class="ml-8 flex items-center gap-2">
+						<div class="h-1.5 flex-1 rounded-full bg-slate-700 overflow-hidden">
+							<div class="h-full rounded-full bg-amber-400/80" style="width: {rewardProgress}%"></div>
+						</div>
+						<span class="w-32 truncate text-[11px] text-slate-500">
+							{nextReward ? `${nextReward.points - m.pointsEarned} to ${nextReward.label}` : 'All rewards unlocked'}
+						</span>
 					</div>
 				{/each}
 			</div>

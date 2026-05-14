@@ -1,8 +1,10 @@
 <script lang="ts">
+	import { apiFetch } from '$lib/api';
+
 	type Props = {
 		adminMode: boolean;
 		onUnlock: () => void;
-		onLock: () => void;
+		onLock: () => void | Promise<void>;
 	};
 
 	let { adminMode, onUnlock, onLock }: Props = $props();
@@ -26,18 +28,18 @@
 	}
 
 	async function verify() {
-		const res = await fetch('/api/admin', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ pin })
-		});
-		if (res.ok) {
+		try {
+			await apiFetch('/api/admin', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ pin })
+			});
 			showPinPad = false;
 			pin = '';
 			errorMsg = '';
 			onUnlock();
-		} else {
-			errorMsg = 'Wrong PIN — try again';
+		} catch {
+			errorMsg = 'Wrong PIN - try again';
 			shake = true;
 			pin = '';
 			setTimeout(() => (shake = false), 500);

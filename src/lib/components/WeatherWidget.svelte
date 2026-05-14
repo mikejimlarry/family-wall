@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
 	import type { WeatherData, WeatherDay } from '$lib/weather';
+	import { apiFetch } from '$lib/api';
 
 	type Props = { initialData: WeatherData | null };
 	let { initialData }: Props = $props();
@@ -70,8 +71,7 @@
 	async function refresh() {
 		loading = true; error = '';
 		try {
-			const res  = await fetch('/api/weather');
-			const json = await res.json() as WeatherData & { needsLocation?: boolean; error?: string };
+			const json = await apiFetch<WeatherData & { needsLocation?: boolean; error?: string }>('/api/weather');
 			if (json.needsLocation) { needsLocation = true; data = null; }
 			else if (json.error)   error = json.error;
 			else { data = json; needsLocation = false; }
@@ -93,12 +93,24 @@
 	}
 
 	async function saveLocation(result: typeof searchResults[0]) {
-		const res = await fetch('/api/weather', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ lat: String(result.latitude), lon: String(result.longitude), city: `${result.name}, ${result.admin1}`, unit: selectedUnit })
-		});
-		if (res.ok) { showEditor = false; searchQuery = ''; searchResults = []; await refresh(); }
+		try {
+			await apiFetch('/api/weather', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					lat: String(result.latitude),
+					lon: String(result.longitude),
+					city: [result.name, result.admin1].filter(Boolean).join(', '),
+					unit: selectedUnit
+				})
+			});
+			showEditor = false;
+			searchQuery = '';
+			searchResults = [];
+			await refresh();
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Failed to save weather location';
+		}
 	}
 
 	onMount(() => {

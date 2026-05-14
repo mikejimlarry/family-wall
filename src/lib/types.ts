@@ -29,6 +29,7 @@ export type GroceryItem = {
 	name: string;
 	checked: boolean;
 	checkedAt: Date | null;
+	category: string;
 	sortOrder: number;
 	createdAt: Date | null;
 };
@@ -52,6 +53,8 @@ export type Chore = {
 	dueDate: string | null;
 	recurrence: string | null;
 	points: number;
+	streakCount: number;
+	lastApprovedDate: string | null;
 	sortOrder: number;
 	createdAt: Date | null;
 };
