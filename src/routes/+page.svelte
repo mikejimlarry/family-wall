@@ -669,7 +669,7 @@
 	<!-- Top bar -->
 	<header class="flex items-center justify-between px-8 pt-6 pb-4 border-b border-slate-800">
 		<Clock />
-		<WeatherWidget initialData={initialWeather as WeatherData | null} />
+		<WeatherWidget initialData={initialWeather as WeatherData | null} {adminMode} />
 	</header>
 
 	<!-- Countdown strip -->
@@ -897,7 +897,7 @@
 								<p class="text-slate-400 text-xs">🎂 {m.birthday}</p>
 							{/if}
 						</div>
-						{#if m.pointsEarned > 0}
+						{#if m.role === 'child' && m.pointsEarned > 0}
 							<span class="text-xs font-semibold px-2 py-1 rounded-full bg-amber-500/20 text-amber-400">
 								⭐ {m.pointsEarned}
 							</span>

@@ -408,8 +408,8 @@
 		{/each}
 
 		<!-- ── Points leaderboard ── -->
-		{#if members.filter(m => m.pointsEarned > 0).length > 0}
-			{@const ranked = members.filter(m => m.pointsEarned > 0).sort((a, b) => b.pointsEarned - a.pointsEarned)}
+		{#if members.filter(m => m.role === 'child' && m.pointsEarned > 0).length > 0}
+			{@const ranked = members.filter(m => m.role === 'child' && m.pointsEarned > 0).sort((a, b) => b.pointsEarned - a.pointsEarned)}
 			{@const topScore = ranked[0]?.pointsEarned ?? 1}
 			<div class="mt-3 rounded-xl bg-slate-800/60 p-3 flex flex-col gap-2">
 				<div class="flex items-center justify-between">

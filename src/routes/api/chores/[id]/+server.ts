@@ -2,7 +2,7 @@ import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getDatabase } from '$lib/server/db';
 import { chores, familyMembers } from '$lib/server/db/schema';
-import { eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { requireAdmin } from '$lib/server/auth';
 import { optionalBoolean, optionalDateString, optionalEnum, optionalInteger, optionalStringArray, optionalTrimmedString, parseValidated, readJsonObject } from '$lib/server/validation';
 
@@ -33,7 +33,6 @@ function localDateStr(d = new Date()): string {
 
 export const PATCH: RequestHandler = async ({ params, request, platform, cookies }) => {
 	const db = await getDatabase(platform);
-	await requireAdmin(db, cookies, platform);
 	const raw = await readJsonObject(request);
 	if (!raw.ok) return raw.response;
 	const parsed = parseValidated(raw.value, (body) => ({
@@ -52,6 +51,14 @@ export const PATCH: RequestHandler = async ({ params, request, platform, cookies
 	if (!parsed.ok) return parsed.response;
 	const body = parsed.value;
 	const has = (key: string) => Object.prototype.hasOwnProperty.call(raw.value, key);
+	const childCanSubmitForReview =
+		has('completed') &&
+		body.completed === true &&
+		Object.keys(raw.value).every((key) => key === 'completed');
+
+	if (!childCanSubmitForReview) {
+		await requireAdmin(db, cookies, platform);
+	}
 
 	const [existing] = await db.select().from(chores).where(eq(chores.id, params.id));
 	if (!existing) throw error(404, 'Chore not found');
@@ -110,12 +117,15 @@ export const PATCH: RequestHandler = async ({ params, request, platform, cookies
 
 	if (!updated) throw error(404, 'Chore not found');
 
-	// Award points to every assigned member
+	// Award points only to child assignees; parents and guests can still be assigned chores.
 	if (awardMemberIds.length > 0 && pointsToAward > 0) {
 		await db
 			.update(familyMembers)
 			.set({ pointsEarned: sql`${familyMembers.pointsEarned} + ${pointsToAward}` })
-			.where(inArray(familyMembers.id, awardMemberIds));
+			.where(and(
+				inArray(familyMembers.id, awardMemberIds),
+				eq(familyMembers.role, 'child')
+			));
 	}
 
 	return json({ ...updated, assignedTo: parseAssignees(updated.assignedTo) });

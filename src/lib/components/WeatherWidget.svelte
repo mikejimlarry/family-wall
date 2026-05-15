@@ -3,8 +3,8 @@
 	import type { WeatherData, WeatherDay } from '$lib/weather';
 	import { apiFetch } from '$lib/api';
 
-	type Props = { initialData: WeatherData | null };
-	let { initialData }: Props = $props();
+	type Props = { initialData: WeatherData | null; adminMode: boolean };
+	let { initialData, adminMode }: Props = $props();
 
 	const seedData = untrack(() => initialData);
 	let data         = $state<WeatherData | null>(seedData);
@@ -80,6 +80,7 @@
 	}
 
 	async function searchLocation() {
+		if (!adminMode) return;
 		if (!searchQuery.trim()) return;
 		searching = true; searchResults = []; searchError = '';
 		try {
@@ -93,6 +94,7 @@
 	}
 
 	async function saveLocation(result: typeof searchResults[0]) {
+		if (!adminMode) return;
 		try {
 			await apiFetch('/api/weather', {
 				method: 'POST',
@@ -124,14 +126,21 @@
 	function onDocClick(e: MouseEvent) {
 		if (panelEl && !panelEl.contains(e.target as Node)) selectedDay = null;
 	}
+
+	$effect(() => {
+		if (!adminMode) showEditor = false;
+	});
 </script>
 
 <svelte:document onclick={onDocClick} />
 
+<div class="weather-widget">
 {#if needsLocation || showEditor}
 	<!-- Location editor -->
 	<div class="flex flex-col gap-2 min-w-56">
-		{#if !showEditor}
+		{#if !adminMode}
+			<div class="text-slate-500 text-sm">Weather not set</div>
+		{:else if !showEditor}
 			<button onclick={() => (showEditor = true)} class="flex items-center gap-2 text-slate-400 hover:text-slate-200 transition-colors text-sm">
 				<span class="text-xl">🌡️</span><span>Set weather location</span>
 			</button>
@@ -213,12 +222,14 @@
 				{/each}
 			</div>
 
-			<!-- Location / settings -->
-			<button
-				onclick={(e) => { e.stopPropagation(); selectedDay = null; showEditor = true; }}
-				class="text-slate-600 hover:text-slate-400 transition-colors text-xs ml-1 shrink-0"
-				title="Change location"
-			>✎</button>
+			{#if adminMode}
+				<!-- Location / settings -->
+				<button
+					onclick={(e) => { e.stopPropagation(); selectedDay = null; showEditor = true; }}
+					class="text-slate-600 hover:text-slate-400 transition-colors text-xs ml-1 shrink-0"
+					title="Change location"
+				>✎</button>
+			{/if}
 		</div>
 
 		<!-- ── Detail panel ────────────────────────────────────── -->
@@ -282,3 +293,10 @@
 
 	</div>
 {/if}
+</div>
+
+<style>
+	:global(html.light) .weather-widget button {
+		box-shadow: none;
+	}
+</style>
